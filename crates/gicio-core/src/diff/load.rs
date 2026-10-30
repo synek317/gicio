@@ -1,5 +1,6 @@
 use super::compute::compute_hunks;
 use super::model::{FileDiff, FileStatus};
+use super::ops::DiffOptions;
 use crate::domain::{CommitId, FilePath, RepoRoot};
 use crate::git::{self, ChangeKind};
 use anyhow::Result;
@@ -37,7 +38,7 @@ pub fn file_texts(root: &RepoRoot, base: &CommitId, path: &FilePath, old_path: O
     }
 }
 
-pub fn load_diff(root: &RepoRoot, base: &CommitId) -> Result<Vec<FileDiff>> {
+pub fn load_diff(root: &RepoRoot, base: &CommitId, opts: DiffOptions) -> Result<Vec<FileDiff>> {
     let mut out = Vec::new();
     for changed in git::changed_files(root, base)? {
         let status = match changed.kind {
@@ -47,7 +48,7 @@ pub fn load_diff(root: &RepoRoot, base: &CommitId) -> Result<Vec<FileDiff>> {
             ChangeKind::Renamed => FileStatus::Renamed,
         };
         let texts = file_texts(root, base, &changed.path, changed.old_path.as_ref(), status)?;
-        let hunks = if texts.binary { Vec::new() } else { compute_hunks(&changed.path, &texts.old, &texts.new) };
+        let hunks = if texts.binary { Vec::new() } else { compute_hunks(&changed.path, &texts.old, &texts.new, opts) };
         if hunks.is_empty() && !texts.binary && status == FileStatus::Modified {
             continue; // e.g. mode-only change
         }

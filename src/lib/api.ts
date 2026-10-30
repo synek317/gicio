@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import type { AiBackend, AnchorInput, FileTexts, JobInfo, LineKey, LspStatus, MarkStatus, SendMode, Snapshot, SourceLocation, ThreadStatus } from './types';
+import type { DiffOptions, FindingStatus, ReviewScope, StageMode, Symbol, Tool, AiBackend, AnchorInput, FileTexts, JobInfo, LineKey, LspStatus, MarkStatus, SendMode, Snapshot, SourceLocation, ThreadStatus } from './types';
 
 export const inTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
@@ -10,7 +10,7 @@ async function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T> 
 }
 
 export const api = {
-  openSession: (repo: string, base: string, backend: AiBackend) => call<Snapshot>('open_session', { repo, base, backend }),
+  openSession: (repo: string, base: string, backend: AiBackend, stageMode: StageMode) => call<Snapshot>('open_session', { repo, base, backend, stageMode }),
   getSession: () => call<Snapshot>('get_session'),
   refresh: () => call<Snapshot>('refresh'),
   listRefs: (repo: string) => call<string[]>('list_refs', { repo }),
@@ -32,6 +32,18 @@ export const api = {
   chatSend: (body: string, allowEdits: boolean) => call<Snapshot>('chat_send', { body, allowEdits }),
   summarize: () => call<void>('summarize'),
   clearChat: () => call<Snapshot>('clear_chat'),
+  submitReview: () => call<Snapshot>('submit_review'),
+  exportReview: () => call<string>('export_review'),
+  aiReview: (scope: ReviewScope, focus: string | null) => call<void>('ai_review', { scope, focus }),
+  setFindingsStatus: (ids: string[], status: FindingStatus) => call<Snapshot>('set_findings_status', { ids, status }),
+  fixFindings: (ids: string[]) => call<Snapshot>('fix_findings', { ids }),
+  stagedStat: () => call<string>('staged_stat'),
+  suggestCommitMessage: () => call<string>('suggest_commit_message'),
+  commit: (message: string) => call<[string, Snapshot]>('commit', { message }),
+  runTool: (tool: Tool) => call<string>('run_tool', { tool }),
+  setDiffOptions: (options: DiffOptions) => call<Snapshot>('set_diff_options', { options }),
+  writeTextFile: (path: string, text: string) => call<void>('write_text_file', { path, text }),
+  lspSymbols: (path: string) => call<Symbol[]>('lsp_symbols', { path }),
   setThreadStatus: (thread: string, status: ThreadStatus) => call<Snapshot>('set_thread_status', { thread, status }),
   lspStatus: () => call<LspStatus>('lsp_status'),
   lspHover: (path: string, line: number, character: number) => call<string | null>('lsp_hover', { path, line, character }),

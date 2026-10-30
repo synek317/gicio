@@ -15,16 +15,28 @@ export interface Prefs {
 export interface AppSettings {
   defaultBackend: BackendForm;
   aiInstructions: string;
+  /** Leave lock files and generated code out of AI planning, reviews and summaries. */
+  skipLowValue: boolean;
+  skipPatterns: string[];
   prefs: Prefs;
   keybindings: Keybindings;
 }
 
 const LOCAL = 'gicio.settings';
 
+/** Mirrors `gicio_core::skip::DEFAULT_SKIP_PATTERNS`. */
+export const DEFAULT_SKIP = [
+  'Cargo.lock', 'package-lock.json', 'yarn.lock', 'pnpm-lock.yaml', 'bun.lockb', 'poetry.lock', 'uv.lock', 'Pipfile.lock',
+  'Gemfile.lock', 'composer.lock', 'go.sum', '*.min.js', '*.min.css', '*.map', '*.snap', '*.pb.go', '*_generated.*',
+  '*.generated.*', 'dist/**', 'vendor/**', 'node_modules/**',
+];
+
 export function defaultSettings(): AppSettings {
   return {
     defaultBackend: { kind: 'claude', command: '', model: '', effort: '', language: 'English' },
     aiInstructions: '',
+    skipLowValue: true,
+    skipPatterns: [...DEFAULT_SKIP],
     prefs: { layout: 'split', order: 'ai', autoAdvance: true, notesExpanded: false, confirmStartOver: true, hoverDelayMs: 450 },
     keybindings: defaultKeybindings(),
   };
@@ -36,6 +48,8 @@ function merge(raw: Partial<AppSettings> | null): AppSettings {
   return {
     defaultBackend: { ...d.defaultBackend, ...raw.defaultBackend },
     aiInstructions: raw.aiInstructions ?? '',
+    skipLowValue: raw.skipLowValue ?? true,
+    skipPatterns: raw.skipPatterns ?? [...DEFAULT_SKIP],
     prefs: { ...d.prefs, ...raw.prefs },
     keybindings: { ...d.keybindings, ...raw.keybindings },
   };

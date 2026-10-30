@@ -5,7 +5,8 @@
   import EditHint from './EditHint.svelte';
   import SendButtons from './SendButtons.svelte';
 
-  let body = $state('');
+  let body = $state(app.composerDraft);
+  app.composerDraft = '';
   let allowEdits = $state(true);
   let sending = $state(false);
   let input: HTMLTextAreaElement | undefined = $state();

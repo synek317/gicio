@@ -25,6 +25,11 @@ pub enum JobKind {
     Plan,
     Chat,
     Summary,
+    Review,
+    AiReview,
+    Fix,
+    Commit,
+    Tool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]

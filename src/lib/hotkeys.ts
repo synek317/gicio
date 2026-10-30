@@ -1,6 +1,7 @@
 import { api } from './api';
 import { acceptRestAndNext, back, editFocused, forward, go, markTarget, moveChunk, moveFocus, nextPendingChunk, openComposer, run } from './actions';
 import { settings } from './app-settings.svelte';
+import { jumpFile, toggleCurrentFile } from './files-nav';
 import { comboOf, type ActionId } from './keymap';
 import { app } from './state.svelte';
 
@@ -10,6 +11,9 @@ const handlers: Record<ActionId, () => void> = {
   nextChunk: () => moveChunk(1),
   prevChunk: () => moveChunk(-1),
   nextPending: () => nextPendingChunk(),
+  nextFile: () => jumpFile(1),
+  prevFile: () => jumpFile(-1),
+  collapseFile: () => toggleCurrentFile(),
   accept: () => markTarget('accepted'),
   defer: () => markTarget('deferred'),
   reset: () => markTarget(null),

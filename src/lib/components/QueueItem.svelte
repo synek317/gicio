@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { go } from '../actions';
+  import { go, markKeys } from '../actions';
+  import { changedKeys } from '../keys';
   import { progressState } from '../progress';
   import { app } from '../state.svelte';
   import type { Chunk } from '../types';
@@ -12,9 +13,18 @@
   const st = $derived(progressState(p));
   const threads = $derived(app.snap?.threads.filter((t) => t.chunk === c.id && t.status === 'open').length ?? 0);
   const active = $derived(app.view?.kind === 'chunk' && app.view.id === c.id);
+
+  function unaccept(e: MouseEvent) {
+    e.stopPropagation();
+    const keys = app.chunkHunks(c).flatMap(changedKeys).filter((k) => app.marks.get(k) === 'accepted');
+    markKeys(keys, null, false);
+  }
 </script>
 
-<li>
+<li class="qrow">
+  {#if p.accepted}
+    <button class="ghost small unaccept" onclick={unaccept} title="Unaccept this whole step (its lines become pending again)">↺</button>
+  {/if}
   <button class="qitem {st}" class:active onclick={() => go({ kind: 'chunk', id: c.id })}>
     <span class="qicon">{icons[st]}</span>
     <span class="qtext">

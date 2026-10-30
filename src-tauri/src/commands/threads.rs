@@ -26,6 +26,8 @@ pub enum SendMode {
     Ask,
     /// Queued background task for the AI; its changes go to the end of the queue.
     Todo,
+    /// Kept as a pending review comment until "Submit review".
+    Review,
 }
 
 fn excerpt(s: &Session, a: &AnchorInput) -> String {
@@ -68,7 +70,9 @@ pub fn set_thread_status(app: AppHandle, state: State<'_, AppState>, thread: Thr
 pub fn send_message(app: AppHandle, state: State<'_, AppState>, thread: ThreadId, body: String, mode: SendMode, allow_edits: Option<bool>) -> Result<Snapshot, String> {
     let mut s = state.session()?;
     s.ensure_not_busy(&thread).map_err(err)?;
-    s.push_message(&thread, Message::new(Author::Human, MessageKind::Text, body.trim())).map_err(err)?;
+    let mut msg = Message::new(Author::Human, MessageKind::Text, body.trim());
+    msg.pending = mode == SendMode::Review;
+    s.push_message(&thread, msg).map_err(err)?;
     let t = s.thread_mut(&thread).map_err(err)?;
     t.status = ThreadStatus::Open;
     if let Some(a) = allow_edits {
@@ -80,7 +84,7 @@ pub fn send_message(app: AppHandle, state: State<'_, AppState>, thread: ThreadId
     }
     let snap = publish(&app, &s);
     drop(s);
-    if mode != SendMode::Note {
+    if matches!(mode, SendMode::Ask | SendMode::Todo) {
         spawn_thread_job(app, thread, body.trim().to_string(), mode == SendMode::Todo);
     }
     Ok(snap)

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { settings, type AppSettings } from '../app-settings.svelte';
+  import { DEFAULT_SKIP, settings, type AppSettings } from '../app-settings.svelte';
   import BackendPicker from './BackendPicker.svelte';
   import ShortcutEditor from './ShortcutEditor.svelte';
 
@@ -9,6 +9,7 @@
 
   async function save() {
     saving = true;
+    draft.skipPatterns = draft.skipPatterns.map((p) => p.trim()).filter(Boolean);
     await settings.save($state.snapshot(draft) as AppSettings);
     saving = false;
     settings.open = false;
@@ -36,6 +37,13 @@
       {#if tab === 'ai'}
         <h3>Defaults for new reviews</h3>
         <BackendPicker bind:form={draft.defaultBackend} />
+        <h3>Files not worth an AI review</h3>
+        <label class="toggle"><input type="checkbox" bind:checked={draft.skipLowValue} /> Leave lock files and generated code out of AI planning, AI reviews and summaries</label>
+        {#if draft.skipLowValue}
+          <p class="muted small">One pattern per line. Without a <code>/</code> it matches the file name anywhere. These files still get reviewed by you; planning puts them in a last step of their own.</p>
+          <textarea rows="5" class="mono" value={draft.skipPatterns.join('\n')} oninput={(e) => (draft.skipPatterns = e.currentTarget.value.split('\n'))}></textarea>
+          <button class="small ghost" onclick={() => (draft.skipPatterns = [...DEFAULT_SKIP])}>Reset to defaults</button>
+        {/if}
         <h3>Your instructions for the AI</h3>
         <p class="muted small">Added to every prompt (planning, answers, to-dos, chat, summaries), on top of the project's CLAUDE.md / AGENTS.md etc.</p>
         <textarea rows="7" bind:value={draft.aiInstructions} placeholder="e.g. Prefer newtypes over raw strings. Point out missing tests. Never suggest unwrap() in library code."></textarea>

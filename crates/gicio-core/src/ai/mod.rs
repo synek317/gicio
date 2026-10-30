@@ -1,6 +1,8 @@
+mod ai_review;
 mod ask_prompt;
 mod backend;
 mod chat_prompt;
+mod commit_prompt;
 mod extra;
 mod overview;
 mod command;
@@ -10,13 +12,18 @@ mod instructions;
 mod json_extract;
 mod language;
 mod model_name;
+mod numbered;
 mod plan;
 mod plan_labels;
 mod plan_prompt;
 mod programs;
+mod review_prompt;
 mod run;
 
+pub use ai_review::{build_ai_review_prompt, build_fix_prompt, parse_findings, RawFinding};
 pub use ask_prompt::build_ask_prompt;
+pub use commit_prompt::build_commit_prompt;
+pub use review_prompt::{build_review_prompt, parse_review_replies, Reply};
 pub use backend::{lenient_backend, AccessMode, AiBackend, Engine, ShellCommand};
 pub use chat_prompt::{build_chat_prompt, build_summary_prompt};
 pub use effort::Effort;

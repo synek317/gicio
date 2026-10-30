@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { acceptRestAndNext, markView, nextPendingChunk, openComposer } from '../actions';
+  import { acceptRestAndNext, markKeys, markView, nextPendingChunk, openComposer } from '../actions';
   import { renderMarkdown } from '../markdown';
   import { hunksProgress } from '../progress';
   import { app } from '../state.svelte';
@@ -25,6 +25,10 @@
   });
 
   let headH = $state(0);
+
+  function unacceptView() {
+    markKeys(app.orderedKeys.filter((k) => app.marks.get(k) === 'accepted'), null, false);
+  }
   const title = $derived(chunk?.title ?? (v?.kind === 'later' ? 'Put off for later' : v?.kind === 'file' ? v.path : ''));
 </script>
 
@@ -45,8 +49,13 @@
       <span class="muted">{prog.accepted} accepted · {prog.deferred} later · {prog.pending} pending</span>
       <span class="spacer"></span>
       <button class="ghost" onclick={() => openComposer(false)}>Ask about this chunk</button>
-      <button onclick={() => markView('deferred')}>Put rest off</button>
-      <button class="primary" onclick={acceptRestAndNext} title="Shift+A">Accept rest & next</button>
+      {#if prog.pending}
+        <button onclick={() => markView('deferred')}>Put rest off</button>
+        <button class="primary" onclick={acceptRestAndNext} title="Shift+A">Accept rest & next</button>
+      {/if}
+      {#if prog.accepted}
+        <button class="ghost" onclick={unacceptView} title="Take back every acceptance in this step">↺ Unaccept step</button>
+      {/if}
     </div>
   </header>
 

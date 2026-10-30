@@ -1,7 +1,7 @@
 import { changedKeys, keyOf } from './keys';
 import { hunksProgress, type Progress } from './progress';
 import { sliceHunk } from './slice';
-import type { AnchorInput, Chunk, FileDiff, Hunk, JobInfo, LspStatus, MarkStatus, Note, Snapshot, SourceLocation, Thread } from './types';
+import type { Finding, AnchorInput, Chunk, FileDiff, Hunk, JobInfo, LspStatus, MarkStatus, Note, Snapshot, SourceLocation, Thread } from './types';
 
 export type View =
   | { kind: 'chunk'; id: string }
@@ -24,17 +24,23 @@ class AppState {
   selection = $state<string[]>([]);
   selAnchor = $state<string | null>(null);
   focusedHunk = $state<string | null>(null);
+  /** Text to prefill the next composer with (e.g. from a finding). */
+  composerDraft = $state('');
   composer = $state<{ anchor: AnchorInput | null; chunk: string | null } | null>(null);
   activeThread = $state<string | null>(null);
   sidebarTab = $state<'queue' | 'files' | 'later'>('queue');
   showAllThreads = $state(false);
-  rightTab = $state<'discussions' | 'chat'>('discussions');
+  rightTab = $state<'discussions' | 'chat' | 'findings'>('discussions');
   showHelp = $state(false);
   lsp = $state<LspStatus>({ state: 'off' });
   toasts = $state<Toast[]>([]);
   hover = $state<HoverInfo | null>(null);
   menu = $state<ContextMenu | null>(null);
   editorDirty = $state(false);
+  /** Extra context lines shown around hunks (by hunk view id). */
+  expand = $state<Record<string, { before: number; after: number }>>({});
+  /** Collapsed file blocks, by `${view id}|${path}`. */
+  collapsed = $state<Record<string, boolean>>({});
   jobs = $state<JobInfo[]>([]);
   /** Files whose diff blocks are on screen (path -> count) and the file under the pointer. */
   onScreen = $state<Record<string, number>>({});
@@ -76,6 +82,21 @@ class AppState {
     }
     return m;
   });
+
+  /** `${path}|${side}|${line}` -> open findings covering that line. */
+  findingLines = $derived.by(() => {
+    const m = new Map<string, Finding[]>();
+    for (const f of this.snap?.findings ?? []) {
+      if (f.status !== 'open' && f.status !== 'fixing') continue;
+      for (let l = f.line; l <= Math.max(f.line, f.endLine); l++) {
+        const k = `${f.path}|${f.side}|${l}`;
+        m.set(k, [...(m.get(k) ?? []), f]);
+      }
+    }
+    return m;
+  });
+
+  pendingReview = $derived((this.snap?.threads ?? []).filter((t) => t.messages.some((m) => m.pending)).length);
 
   /** `${path}|${side}|${line}` -> AI notes from the plan. */
   noteLines = $derived.by(() => {

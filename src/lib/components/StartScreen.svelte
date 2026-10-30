@@ -34,7 +34,8 @@
     try {
       s.recent = [s.repo, ...s.recent.filter((r) => r !== s.repo)].slice(0, 8);
       saveSettings($state.snapshot(s));
-      const snap = await api.openSession(s.repo, s.scope === 'uncommitted' ? 'HEAD' : s.base, backend);
+      const stageMode = s.scope === 'uncommitted' ? s.stage : 'memory';
+      const snap = await api.openSession(s.repo, s.scope === 'uncommitted' ? 'HEAD' : s.base, backend, stageMode);
       app.layout = settings.value.prefs.layout;
       app.applySnapshot(snap);
       app.history = [];
@@ -79,6 +80,19 @@
           <div class="chips">{#each ['main', 'master', 'origin/main', 'HEAD~1'] as r}<button class="chip" onclick={() => (s.base = r)}>{r}</button>{/each}</div>
         </div>
       {/if}
+    </fieldset>
+
+    <fieldset>
+      <legend>Accepted changes</legend>
+      <label class="choice"><input type="radio" bind:group={s.stage} value="memory" />
+        <span><strong>Remember them in gicio only</strong><br /><span class="muted small">Your git index is not touched.</span></span>
+      </label>
+      <label class="choice" class:disabled={s.scope !== 'uncommitted'}><input type="radio" bind:group={s.stage} value="index" disabled={s.scope !== 'uncommitted'} />
+        <span><strong>Stage them in git</strong><br /><span class="muted small">
+          {#if s.scope !== 'uncommitted'}Only for uncommitted changes.{:else}Accepted lines are staged (also parts of files), everything else is not, so you can commit exactly what you reviewed.
+          <span class="warn-text">Everything currently staged is unstaged first.</span>{/if}
+        </span></span>
+      </label>
     </fieldset>
 
     <fieldset>

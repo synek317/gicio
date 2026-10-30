@@ -5,14 +5,15 @@ use gicio_core::ai::AiBackend;
 use gicio_core::diff::{self, FileTexts};
 use gicio_core::domain::{ChunkId, FilePath, GitRef};
 use gicio_core::review::{Session, Snapshot};
+use gicio_core::stage::StageMode;
 use std::path::PathBuf;
 use tauri::{AppHandle, State};
 
 const MAX_PEEK_BYTES: u64 = 4 * 1024 * 1024;
 
 #[tauri::command]
-pub async fn open_session(app: AppHandle, state: State<'_, AppState>, repo: PathBuf, base: GitRef, backend: AiBackend) -> Result<Snapshot, String> {
-    let session = tauri::async_runtime::spawn_blocking(move || Session::open(&repo, base, backend)).await.map_err(err)?.map_err(err)?;
+pub async fn open_session(app: AppHandle, state: State<'_, AppState>, repo: PathBuf, base: GitRef, backend: AiBackend, stage_mode: StageMode) -> Result<Snapshot, String> {
+    let session = tauri::async_runtime::spawn_blocking(move || Session::open(&repo, base, backend, stage_mode)).await.map_err(err)?.map_err(err)?;
     let root = session.state.repo.clone();
     let snap = publish(&app, &session);
     state.replace_session(session);
@@ -69,4 +70,17 @@ pub fn save_file(app: AppHandle, state: State<'_, AppState>, path: FilePath, tex
     let mut s = state.session()?;
     s.save_user_edit(&path, &text, after).map_err(err)?;
     Ok(publish(&app, &s))
+}
+
+#[tauri::command]
+pub fn set_diff_options(app: AppHandle, state: State<'_, AppState>, options: gicio_core::diff::DiffOptions) -> Result<Snapshot, String> {
+    let mut s = state.session()?;
+    s.set_diff_options(options).map_err(err)?;
+    Ok(publish(&app, &s))
+}
+
+/// Writes an exported file the user picked in a save dialog.
+#[tauri::command]
+pub fn write_text_file(path: PathBuf, text: String) -> Result<(), String> {
+    std::fs::write(path, text).map_err(err)
 }

@@ -71,8 +71,8 @@
     <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
     <div class="messages" onclick={links}>
       {#each thread.messages as m}
-        <div class="msg {m.author.kind} {m.kind}">
-          <div class="who">{who(m)}</div>
+        <div class="msg {m.author.kind} {m.kind}" class:pending={m.pending}>
+          <div class="who">{who(m)}{#if m.pending} <span class="badge">pending review</span>{/if}</div>
           <div class="md">{@html renderMarkdown(m.body)}</div>
         </div>
       {/each}

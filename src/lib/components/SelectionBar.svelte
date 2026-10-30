@@ -1,5 +1,11 @@
 <script lang="ts">
-  import { markTarget, openComposer } from '../actions';
+  import { markTarget, openComposer, selectionAnchor } from '../actions';
+  import { reviewWithAi } from '../review-actions';
+
+  function reviewSelection() {
+    const a = selectionAnchor();
+    if (a) reviewWithAi({ kind: 'lines', ...a });
+  }
   import { app } from '../state.svelte';
 </script>
 
@@ -10,6 +16,7 @@
     <button onclick={() => markTarget('deferred')}>Later <kbd>d</kbd></button>
     <button onclick={() => markTarget(null)}>Reset <kbd>u</kbd></button>
     <button onclick={() => openComposer()}>Comment / ask <kbd>c</kbd></button>
+    <button onclick={reviewSelection} title="Let the AI review just these lines">AI review</button>
     <button class="ghost" onclick={() => (app.selection = [])}>Clear <kbd>esc</kbd></button>
   </div>
 {/if}

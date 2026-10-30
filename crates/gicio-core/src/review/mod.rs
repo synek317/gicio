@@ -1,15 +1,20 @@
 mod chunk;
 mod coverage;
+mod export;
+mod finding;
 mod fallback_plan;
 mod marks;
 mod reconcile;
 mod session;
+mod session_findings;
 mod snapshot;
 mod state;
 mod thread;
 
 pub use chunk::{Chunk, ChunkOrigin, HunkPart, HunkRef, Note, PlannedChunk, PlannedItem};
 pub use coverage::Coverage;
+pub use export::export_markdown;
+pub use finding::{Finding, FindingId, FindingSource, FindingStatus, Severity};
 pub use fallback_plan::fallback_plan;
 pub use marks::{LineKey, Mark, MarkStatus, Marks};
 pub use reconcile::{reconcile, FollowUp};

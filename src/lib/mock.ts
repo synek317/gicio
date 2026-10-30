@@ -26,6 +26,9 @@ function lineText(s: Snapshot, k: LineKey): string | null {
 export async function mockInvoke(cmd: string, args: Record<string, any> = {}): Promise<unknown> {
   const fx = await load();
   const s = fx.snapshot;
+  s.findings ??= [];
+  s.diffOptions ??= { ignoreWhitespace: false };
+  s.stageMode ??= 'memory';
   const bump = () => ({ ...s, version: ++s.version, canUndo: undo.length > 0 });
   switch (cmd) {
     case 'open_session':
@@ -59,8 +62,8 @@ export async function mockInvoke(cmd: string, args: Record<string, any> = {}): P
     }
     case 'send_message': {
       const t = s.threads.find((t) => t.id === args.thread)!;
-      t.messages.push({ author: { kind: 'human' }, kind: 'text', body: args.body, at: Date.now() / 1000 });
-      if (args.mode !== 'note') t.messages.push({ author: { kind: 'ai', backend: 'mock' }, kind: 'text', body: 'Mock answer with `code` and\n\n```rust\nfn x() {}\n```', at: Date.now() / 1000 });
+      t.messages.push({ author: { kind: 'human' }, kind: 'text', body: args.body, at: Date.now() / 1000, pending: args.mode === 'review' });
+      if (args.mode === 'ask' || args.mode === 'todo') t.messages.push({ author: { kind: 'ai', backend: 'mock' }, kind: 'text', body: 'Mock answer with `code` and\n\n```rust\nfn x() {}\n```', at: Date.now() / 1000 });
       return bump();
     }
     case 'set_thread_status':
@@ -83,6 +86,31 @@ export async function mockInvoke(cmd: string, args: Record<string, any> = {}): P
     case 'clear_chat':
       s.chat = [];
       return bump();
+    case 'submit_review':
+      s.threads.forEach((t) => t.messages.forEach((m) => (m.pending = false)));
+      return bump();
+    case 'export_review':
+      return '# Review (mock)';
+    case 'ai_review':
+    case 'run_tool':
+      return null;
+    case 'set_findings_status':
+      s.findings = (s.findings ?? []).map((f) => (args.ids.includes(f.id) ? { ...f, status: args.status } : f));
+      return bump();
+    case 'fix_findings':
+      s.findings = (s.findings ?? []).map((f) => (args.ids.includes(f.id) ? { ...f, status: 'fixing' } : f));
+      return bump();
+    case 'staged_stat':
+      return ' src/a.rs | 3 ++-\n 1 file changed';
+    case 'suggest_commit_message':
+      return 'Add mock commit message\n\nBody.';
+    case 'commit':
+      return ['abc1234', bump()];
+    case 'set_diff_options':
+      s.diffOptions = args.options;
+      return bump();
+    case 'lsp_symbols':
+      return [];
     case 'set_backend':
       s.backend = args.backend;
       return bump();

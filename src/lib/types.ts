@@ -17,7 +17,7 @@ export interface Mark extends LineKey { text: string; status: MarkStatus }
 export interface AnchorInput { path: string; side: Side; start: number; end: number }
 export interface Anchor extends AnchorInput { excerpt: string }
 export type Author = { kind: 'human' } | { kind: 'ai'; backend: string } | { kind: 'system' };
-export interface Message { author: Author; kind: 'text' | 'error' | 'codeChanged'; body: string; at: number }
+export interface Message { author: Author; kind: 'text' | 'error' | 'codeChanged'; body: string; at: number; pending?: boolean }
 export interface Thread { id: string; chunk: string | null; anchor: Anchor | null; status: ThreadStatus; allowEdits: boolean; todo: boolean; messages: Message[]; busy: boolean }
 
 export type BackendKind = 'claude' | 'codex' | 'copilot' | 'custom';
@@ -25,10 +25,18 @@ export type Engine = { kind: 'claude' | 'codex' | 'copilot' } | { kind: 'custom'
 export type Effort = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 export interface AiBackend { engine: Engine; model: string | null; effort: Effort | null; language: string }
 export interface InstructionFile { path: string; kind: string; skill: [string, string] | null; native: boolean }
-export type JobKind = 'ask' | 'todo' | 'plan' | 'chat' | 'summary';
+export type JobKind = 'ask' | 'todo' | 'plan' | 'chat' | 'summary' | 'review' | 'aiReview' | 'fix' | 'commit' | 'tool';
 export type JobStatus = 'queued' | 'running' | 'done' | 'failed' | 'cancelled';
 export interface JobInfo { id: string; kind: JobKind; status: JobStatus; title: string; thread: string | null; log: string[] }
-export type SendMode = 'note' | 'ask' | 'todo';
+export type SendMode = 'note' | 'ask' | 'todo' | 'review';
+export type StageMode = 'memory' | 'index';
+export interface DiffOptions { ignoreWhitespace: boolean }
+export type Severity = 'error' | 'warning' | 'info';
+export type FindingStatus = 'open' | 'fixing' | 'fixed' | 'dismissed';
+export interface Finding { id: string; source: 'ai' | 'clippy'; severity: Severity; path: string; side: Side; line: number; endLine: number; title: string; detail: string; status: FindingStatus }
+export type ReviewScope = { kind: 'all' } | { kind: 'chunk'; id: string } | { kind: 'lines'; path: string; side: Side; start: number; end: number };
+export type Tool = 'fmt' | 'clippy' | 'clippyFix';
+export interface Symbol { name: string; kind: number; start: number; end: number }
 
 export interface Snapshot {
   version: number;
@@ -41,6 +49,9 @@ export interface Snapshot {
   marks: Mark[];
   threads: Thread[];
   chat: Message[];
+  findings: Finding[];
+  diffOptions: DiffOptions;
+  stageMode: StageMode;
   summary: Message | null;
   chatBusy: boolean;
   summaryBusy: boolean;

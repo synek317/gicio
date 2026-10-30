@@ -3,9 +3,12 @@
   import { api } from '../api';
   import { app } from '../state.svelte';
   import { settings } from '../app-settings.svelte';
+  import CommitDialog from './CommitDialog.svelte';
+  import ToolsMenu from './ToolsMenu.svelte';
 
   const s = $derived(app.snap!);
   const repoName = $derived(s.repo.split('/').pop());
+  let showCommit = $state(false);
 </script>
 
 <header class="topbar">
@@ -22,6 +25,11 @@
     <button class:active={app.layout === 'split'} onclick={() => (app.layout = 'split')}>Split</button>
     <button class:active={app.layout === 'unified'} onclick={() => (app.layout = 'unified')}>Unified</button>
   </div>
+  {#if s.stageMode === 'index'}
+    <span class="badge stage" title="Accepted lines are staged in git; everything else is unstaged">staging accepted</span>
+    <button onclick={() => (showCommit = true)}>Commit…</button>
+  {/if}
+  <ToolsMenu />
   {#if !s.plannedByAi}
     <button class="primary" disabled={s.planning} onclick={() => plan(false)}>{s.planning ? 'Planning…' : 'Plan with AI'}</button>
   {:else}
@@ -34,3 +42,5 @@
   <button class="ghost" onclick={() => (app.showHelp = true)}>?</button>
   <button class="ghost" onclick={() => { app.snap = null; app.view = null; }} title="Back to start screen">✕</button>
 </header>
+
+{#if showCommit}<CommitDialog close={() => (showCommit = false)} />{/if}

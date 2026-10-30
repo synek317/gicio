@@ -6,6 +6,8 @@
   import { app } from '../state.svelte';
   import type { Hunk } from '../types';
   import LineCell from './LineCell.svelte';
+  import { enclosingRange, extendHunk, room } from '../expand';
+  import { texts } from '../texts.svelte';
 
   let { hunk }: { hunk: Hunk } = $props();
 
@@ -15,6 +17,27 @@
   // A side-by-side view of an added or deleted file is half empty.
   const status = $derived(app.files.get(hunk.path)?.status);
   const split = $derived(app.layout === 'split' && status !== 'added' && status !== 'deleted');
+
+  const STEP = 20;
+  const newText = $derived(texts.entries[hunk.path]?.texts?.new ?? null);
+  const newLines = $derived(newText?.split('\n') ?? []);
+  const lineCount = $derived(newText == null ? 0 : newText.endsWith('\n') ? newLines.length - 1 : newLines.length);
+  const extra = $derived(app.expand[hunk.id] ?? { before: 0, after: 0 });
+  const space = $derived(newText == null || status === 'deleted' ? { before: 0, after: 0 } : room(hunk, app.files.get(hunk.path)?.hunks ?? [], lineCount));
+  const shown = $derived(extendHunk(hunk, extra, newLines));
+
+  function grow(before: number, after: number) {
+    app.expand = { ...app.expand, [hunk.id]: { before: Math.min(space.before, extra.before + before), after: Math.min(space.after, extra.after + after) } };
+  }
+
+  async function wholeFunction(e: MouseEvent) {
+    e.stopPropagation();
+    const news = hunk.lines.map((l) => l.newNo).filter((n): n is number => n != null);
+    if (!news.length) return;
+    const r = await enclosingRange(hunk.path, news[0], news[news.length - 1], newLines);
+    if (!r) return app.toast('No enclosing function found');
+    grow(Math.max(0, news[0] - r[0] - extra.before), Math.max(0, r[1] - news[news.length - 1] - extra.after));
+  }
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions, a11y_click_events_have_key_events -->
@@ -32,16 +55,22 @@
     {#if hunk.baseId}<span class="badge" title="The AI split a larger hunk; the rest is in another step">part of hunk</span>{/if}
     <span class="prog">{prog.accepted}/{prog.total} ✓{#if prog.deferred} · {prog.deferred} ⏸{/if}</span>
     <span class="spacer"></span>
-    <button onclick={(e) => { e.stopPropagation(); focusHunk(hunk.id); markKeys(keys, 'accepted'); }}>Accept hunk</button>
-    <button onclick={(e) => { e.stopPropagation(); markKeys(keys, 'deferred'); }}>Later</button>
+    {#if prog.accepted < prog.total}
+      <button onclick={(e) => { e.stopPropagation(); focusHunk(hunk.id); markKeys(keys, 'accepted'); }}>Accept hunk</button>
+      <button onclick={(e) => { e.stopPropagation(); markKeys(keys, 'deferred'); }}>Later</button>
+    {/if}
+    {#if space.before + space.after > 0}<button class="ghost" onclick={wholeFunction} title="Show the whole enclosing function (rust-analyzer, or a guess for other languages)">⤢ Function</button>{/if}
     {#if status !== 'deleted'}<button class="ghost" onclick={(e) => { e.stopPropagation(); editFile(hunk.path, hunk.newStart); }} title="Open the file at this place; you can edit it there (e)">Open</button>{/if}
     {#if prog.accepted + prog.deferred > 0}
-      <button class="ghost" onclick={(e) => { e.stopPropagation(); markKeys(keys, null); }}>Reset</button>
+      <button class="ghost" onclick={(e) => { e.stopPropagation(); markKeys(keys, null, false); }} title="Back to pending">↺ {prog.accepted === prog.total ? 'Unaccept' : 'Reset'}</button>
     {/if}
   </header>
+  {#if extra.before < space.before}
+    <div class="expand-row"><button onclick={(e) => { e.stopPropagation(); grow(STEP, 0); }}>↑ {Math.min(STEP, space.before - extra.before)} more lines</button></div>
+  {/if}
   {#if split}
     <div class="rows split">
-      {#each splitRows(hunk) as row, i (i)}
+      {#each splitRows(shown) as row, i (i)}
         <div class="srow">
           <LineCell cell={row.left} path={hunk.path} />
           <LineCell cell={row.right} path={hunk.path} />
@@ -50,9 +79,12 @@
     </div>
   {:else}
     <div class="rows unified">
-      {#each unifiedRows(hunk) as row, i (i)}
+      {#each unifiedRows(shown) as row, i (i)}
         <LineCell cell={row.cell} path={hunk.path} oldNo={row.oldNo} newNo={row.newNo} unified />
       {/each}
     </div>
+  {/if}
+  {#if extra.after < space.after}
+    <div class="expand-row"><button onclick={(e) => { e.stopPropagation(); grow(0, STEP); }}>↓ {Math.min(STEP, space.after - extra.after)} more lines</button></div>
   {/if}
 </section>

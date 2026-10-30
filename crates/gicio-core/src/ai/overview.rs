@@ -2,6 +2,7 @@
 
 use crate::diff::{FileStatus, LineKind};
 use crate::review::{LineKey, Session, ThreadStatus};
+use crate::skip::SkipFilter;
 
 const DIFF_BUDGET: usize = 250_000;
 
@@ -53,10 +54,11 @@ pub fn change_overview(s: &Session) -> String {
     out
 }
 
-/// The diff itself, shortened per hunk until it fits the budget.
-pub fn change_diff(s: &Session) -> String {
+/// The diff itself, shortened per hunk until it fits the budget. Skipped files are only named.
+pub fn change_diff(s: &Session, skip: &SkipFilter) -> String {
+    let skipped: Vec<String> = s.files.iter().filter(|f| skip.skips(&f.path)).map(|f| format!("--- {} (lock/generated file, content omitted)\n", f.path)).collect();
     let render = |max: usize| {
-        s.files.iter().flat_map(|f| f.hunks.iter()).map(|h| format!("--- {} {}\n{}", h.path, h.header(), h.as_unified(max))).collect::<String>()
+        s.files.iter().filter(|f| !skip.skips(&f.path)).flat_map(|f| f.hunks.iter()).map(|h| format!("--- {} {}\n{}", h.path, h.header(), h.as_unified(max))).chain(skipped.iter().cloned()).collect::<String>()
     };
     [400, 120, 30, 5].iter().map(|m| render(*m)).find(|d| d.len() <= DIFF_BUDGET).unwrap_or_else(|| render(0))
 }

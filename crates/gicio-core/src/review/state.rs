@@ -16,17 +16,23 @@ pub struct ReviewState {
     pub marks: Marks,
     pub threads: Vec<Thread>,
     pub planned_by_ai: bool,
+    #[serde(default)]
+    pub diff_options: crate::diff::DiffOptions,
+    #[serde(default)]
+    pub stage_mode: crate::stage::StageMode,
     /// Free conversation about the whole change (the Chat tab).
     #[serde(default)]
     pub chat: Vec<Message>,
     #[serde(default)]
     pub summary: Option<Message>,
+    #[serde(default)]
+    pub findings: Vec<super::Finding>,
     next_id: u64,
 }
 
 impl ReviewState {
     pub fn new(repo: RepoRoot, base_ref: GitRef, base_commit: CommitId, backend: AiBackend) -> Self {
-        Self { repo, base_ref, base_commit, backend, chunks: Vec::new(), marks: Marks::default(), threads: Vec::new(), planned_by_ai: false, chat: Vec::new(), summary: None, next_id: 1 }
+        Self { repo, base_ref, base_commit, backend, chunks: Vec::new(), marks: Marks::default(), threads: Vec::new(), planned_by_ai: false, diff_options: Default::default(), stage_mode: Default::default(), chat: Vec::new(), summary: None, findings: Vec::new(), next_id: 1 }
     }
 
     fn next(&mut self) -> u64 {
@@ -41,5 +47,9 @@ impl ReviewState {
 
     pub fn next_thread_id(&mut self) -> ThreadId {
         ThreadId::new(self.next())
+    }
+
+    pub fn next_finding_id(&mut self) -> super::FindingId {
+        super::FindingId::new(self.next())
     }
 }

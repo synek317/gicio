@@ -2,11 +2,12 @@ use crate::publish::{err, publish};
 use crate::jobs::{JobKind, JobStatus, Jobs};
 use crate::state::AppState;
 use gicio_core::ai::{self, PlanRequest};
-use gicio_core::review::{Chunk, Snapshot};
+use gicio_core::domain::HunkId;
+use gicio_core::review::{Chunk, PlannedChunk, PlannedItem, Snapshot};
 use std::collections::HashSet;
 use tauri::{AppHandle, State};
 
-fn begin(app: &AppHandle, state: &AppState, replan: bool) -> Result<(PlanRequest, Vec<Chunk>), String> {
+fn begin(app: &AppHandle, state: &AppState, replan: bool) -> Result<(PlanRequest, Vec<Chunk>, Vec<HunkId>), String> {
     let mut s = state.session()?;
     if s.planning {
         return Err("planning is already running".into());
@@ -17,7 +18,9 @@ fn begin(app: &AppHandle, state: &AppState, replan: bool) -> Result<(PlanRequest
     } else {
         (Vec::new(), None)
     };
-    let hunks = s.files.iter().flat_map(|f| f.hunks.iter()).filter(|h| wanted.as_ref().is_none_or(|w| w.contains(&h.id))).cloned().collect();
+    let skip = state.settings.skip_filter();
+    let (skipped, hunks): (Vec<_>, Vec<_>) = s.files.iter().flat_map(|f| f.hunks.iter()).filter(|h| wanted.as_ref().is_none_or(|w| w.contains(&h.id))).cloned().partition(|h| skip.skips(&h.path));
+    let skipped: Vec<HunkId> = skipped.into_iter().map(|h| h.id).collect();
     let req = PlanRequest {
         backend: s.state.backend.clone(),
         repo: s.state.repo.clone(),
@@ -30,11 +33,11 @@ fn begin(app: &AppHandle, state: &AppState, replan: bool) -> Result<(PlanRequest
     s.planning = true;
     s.touch();
     publish(app, &s);
-    Ok((req, keep))
+    Ok((req, keep, skipped))
 }
 
 async fn plan_and_apply(app: AppHandle, state: State<'_, AppState>, replan: bool) -> Result<Snapshot, String> {
-    let (req, keep) = begin(&app, &state, replan)?;
+    let (req, keep, skipped) = begin(&app, &state, replan)?;
     let title = if replan { "Re-plan remaining steps" } else { "Plan review steps" };
     let job = state.jobs.add(&app, JobKind::Plan, title.into(), None, JobStatus::Running);
     let cancel = state.jobs.start(&app, &job);
@@ -48,7 +51,15 @@ async fn plan_and_apply(app: AppHandle, state: State<'_, AppState>, replan: bool
     s.planning = false;
     s.touch();
     match result {
-        Ok(planned) => {
+        Ok(mut planned) => {
+            if !skipped.is_empty() {
+                planned.push(PlannedChunk {
+                    title: "Lock files and generated code".into(),
+                    summary: "Not sent to the AI (see Settings → AI → skip). Usually not worth a line-by-line review; skim and accept.".into(),
+                    items: skipped.iter().map(|id| PlannedItem { hunk: id.clone(), part: None }).collect(),
+                    notes: Vec::new(),
+                });
+            }
             // Chunks kept during a replan may have changed meanwhile; take their current version.
             let keep = keep.into_iter().filter_map(|k| s.chunk(&k.id).cloned()).collect();
             s.apply_plan(keep, planned, true);

@@ -25,6 +25,16 @@ pub struct SourceLocation {
     pub preview: Option<String>,
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Symbol {
+    pub name: String,
+    /// LSP SymbolKind (12 = function, 6 = method, 5 = class, 23 = struct, …).
+    pub kind: u32,
+    pub start: u32,
+    pub end: u32,
+}
+
 pub struct RustAnalyzer {
     client: LspClient,
     root: RepoRoot,
@@ -44,6 +54,7 @@ impl RustAnalyzer {
                 "textDocument": {
                     "hover": {"contentFormat": ["markdown", "plaintext"]},
                     "definition": {"linkSupport": true},
+                    "documentSymbol": {"hierarchicalDocumentSymbolSupport": true},
                     "synchronization": {"didSave": false}
                 },
                 "general": {"positionEncodings": ["utf-16"]}
@@ -110,6 +121,33 @@ impl RustAnalyzer {
         params["context"] = json!({"includeDeclaration": true});
         let res = self.client.request("textDocument/references", params, REQUEST_TIMEOUT).await?;
         Ok(self.locations(res))
+    }
+
+    /// Functions, methods, impls etc. of a file as flat line ranges (1-based, inclusive).
+    pub async fn symbols(&self, path: &FilePath) -> Result<Vec<Symbol>> {
+        let uri = self.sync(path).await?;
+        let res = self.client.request("textDocument/documentSymbol", json!({"textDocument": {"uri": uri}}), REQUEST_TIMEOUT).await?;
+        let mut out = Vec::new();
+        fn walk(items: &[Value], out: &mut Vec<Symbol>) {
+            for it in items {
+                let range = it.get("range").or_else(|| it.pointer("/location/range"));
+                if let Some(r) = range {
+                    out.push(Symbol {
+                        name: it.get("name").and_then(Value::as_str).unwrap_or_default().to_string(),
+                        kind: it.get("kind").and_then(Value::as_u64).unwrap_or(0) as u32,
+                        start: r.pointer("/start/line").and_then(Value::as_u64).unwrap_or(0) as u32 + 1,
+                        end: r.pointer("/end/line").and_then(Value::as_u64).unwrap_or(0) as u32 + 1,
+                    });
+                }
+                if let Some(children) = it.get("children").and_then(Value::as_array) {
+                    walk(children, out);
+                }
+            }
+        }
+        if let Value::Array(items) = res {
+            walk(&items, &mut out);
+        }
+        Ok(out)
     }
 
     /// Normalises Location | Location[] | LocationLink[] and attaches line previews.

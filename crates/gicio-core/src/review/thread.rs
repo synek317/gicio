@@ -44,12 +44,15 @@ pub struct Message {
     pub kind: MessageKind,
     pub body: String,
     pub at: u64,
+    /// A reviewer comment waiting for "Submit review".
+    #[serde(default)]
+    pub pending: bool,
 }
 
 impl Message {
     pub fn new(author: Author, kind: MessageKind, body: impl Into<String>) -> Self {
         let at = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
-        Self { author, kind, body: body.into(), at }
+        Self { author, kind, body: body.into(), at, pending: false }
     }
 }
 

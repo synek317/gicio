@@ -1,7 +1,8 @@
+import { intraLine } from './intraline';
 import { keyOf } from './keys';
-import type { Hunk, LineKind, Side } from './types';
+import type { DiffLine, Hunk, LineKind, Side } from './types';
 
-export interface Cell { side: Side; no: number; text: string; kind: LineKind; key: string | null }
+export interface Cell { side: Side; no: number; text: string; kind: LineKind; key: string | null; hl?: [number, number][] }
 export interface UnifiedRow { cell: Cell; oldNo: number | null; newNo: number | null }
 export interface SplitRow { left: Cell | null; right: Cell | null }
 
@@ -14,8 +15,37 @@ function cellsOf(h: Hunk) {
   });
 }
 
+/** Pairs each run of removed lines with the following run of added lines, i-th with i-th. */
+function pairs(lines: DiffLine[]): [number, number][] {
+  const out: [number, number][] = [];
+  for (let i = 0; i < lines.length; ) {
+    if (lines[i].kind !== 'removed') {
+      i++;
+      continue;
+    }
+    const rs = i;
+    while (i < lines.length && lines[i].kind === 'removed') i++;
+    const as = i;
+    while (i < lines.length && lines[i].kind === 'added') i++;
+    for (let k = 0; k < Math.min(as - rs, i - as); k++) out.push([rs + k, as + k]);
+  }
+  return out;
+}
+
+function withHighlights(h: Hunk) {
+  const cells = cellsOf(h);
+  for (const [r, a] of pairs(h.lines)) {
+    const d = intraLine(h.lines[r].text, h.lines[a].text);
+    if (d) {
+      cells[r].cell.hl = d.old;
+      cells[a].cell.hl = d.new;
+    }
+  }
+  return cells;
+}
+
 export function unifiedRows(h: Hunk): UnifiedRow[] {
-  return cellsOf(h).map(({ line, cell }) => ({ cell, oldNo: line.oldNo, newNo: line.newNo }));
+  return withHighlights(h).map(({ line, cell }) => ({ cell, oldNo: line.oldNo, newNo: line.newNo }));
 }
 
 /** Pairs runs of removed/added lines side by side, like kdiff3. */
@@ -28,7 +58,7 @@ export function splitRows(h: Hunk): SplitRow[] {
     removed = [];
     added = [];
   };
-  for (const { line, cell } of cellsOf(h)) {
+  for (const { line, cell } of withHighlights(h)) {
     if (line.kind === 'removed') {
       if (added.length) flush();
       removed.push(cell);

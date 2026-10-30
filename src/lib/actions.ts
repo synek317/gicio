@@ -183,6 +183,21 @@ export function editFile(path: string, line: number | null = null) {
   go({ kind: 'source', title: path, absPath: `${app.snap!.repo}/${path}`, repoPath: path, line });
 }
 
+/** Shows a diff line wherever it is: the step containing it, else the file view of the diff. */
+export function revealLine(path: string, side: 'old' | 'new', line: number) {
+  const holds = (h: { path: string; lines: { oldNo: number | null; newNo: number | null }[] }) =>
+    h.path === path && h.lines.some((l) => (side === 'old' ? l.oldNo : l.newNo) === line);
+  const chunk = app.snap?.chunks.find((c) => app.chunkHunks(c).some(holds));
+  const here = app.viewHunks.some(holds);
+  if (!here) go(chunk ? { kind: 'chunk', id: chunk.id } : { kind: 'file', path });
+  setTimeout(() => scrollToLine(path, side, line), here ? 0 : 120);
+}
+
+/** Lines the selection (or focused hunk) covers, for anchoring comments or an AI review. */
+export function selectionAnchor(): AnchorInput | null {
+  return currentAnchor();
+}
+
 export function editFocused() {
   const v = app.view;
   if (v?.kind === 'source') return;

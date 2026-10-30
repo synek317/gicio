@@ -4,6 +4,7 @@ import type { BackendKind, Effort } from './types';
 export interface Settings {
   repo: string;
   scope: 'uncommitted' | 'since';
+  stage: 'memory' | 'index';
   base: string;
   kind: BackendKind;
   model: string;
@@ -15,7 +16,7 @@ export interface Settings {
 }
 
 const KEY = 'gicio.start';
-const DEFAULTS: Settings = { repo: '', scope: 'uncommitted', base: 'main', kind: 'claude', model: '', effort: '', command: '', language: 'English', order: 'ai', recent: [] };
+const DEFAULTS: Settings = { repo: '', scope: 'uncommitted', stage: 'memory', base: 'main', kind: 'claude', model: '', effort: '', command: '', language: 'English', order: 'ai', recent: [] };
 
 export function loadSettings(): Settings {
   try {

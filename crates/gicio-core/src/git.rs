@@ -18,6 +18,25 @@ fn git(dir: &Path, args: &[&str]) -> Result<Vec<u8>> {
     Ok(out.stdout)
 }
 
+fn git_with_input(dir: &Path, args: &[&str], input: &[u8]) -> Result<Vec<u8>> {
+    use std::io::Write;
+    let mut child = Command::new("git")
+        .arg("-C")
+        .arg(dir)
+        .args(args)
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .context("failed to run git")?;
+    child.stdin.take().context("no stdin")?.write_all(input)?;
+    let out = child.wait_with_output()?;
+    if !out.status.success() {
+        bail!("git {}: {}", args.join(" "), String::from_utf8_lossy(&out.stderr).trim());
+    }
+    Ok(out.stdout)
+}
+
 fn git_str(dir: &Path, args: &[&str]) -> Result<String> {
     Ok(String::from_utf8(git(dir, args)?)?.trim().to_string())
 }
@@ -85,4 +104,34 @@ pub fn changed_files(root: &RepoRoot, base: &CommitId) -> Result<Vec<ChangedFile
 
 pub fn show_file(root: &RepoRoot, commit: &CommitId, path: &FilePath) -> Result<Vec<u8>> {
     git(root.path(), &["show", &format!("{}:{}", commit.as_str(), path.as_str())])
+}
+
+/// Unstages everything (index back to HEAD), keeping the working tree.
+pub fn unstage_all(root: &RepoRoot) -> Result<()> {
+    git(root.path(), &["reset", "-q"]).map(|_| ())
+}
+
+/// Index entry of `path` back to HEAD (removed from the index if HEAD doesn't have it).
+pub fn reset_path(root: &RepoRoot, path: &FilePath) -> Result<()> {
+    git(root.path(), &["reset", "-q", "--", path.as_str()]).map(|_| ())
+}
+
+pub fn remove_from_index(root: &RepoRoot, path: &FilePath) -> Result<()> {
+    git(root.path(), &["rm", "--cached", "-q", "--ignore-unmatch", "--", path.as_str()]).map(|_| ())
+}
+
+/// Puts `content` into the index as `path` without touching the working tree.
+pub fn stage_content(root: &RepoRoot, path: &FilePath, mode: &str, content: &[u8]) -> Result<()> {
+    let sha = String::from_utf8(git_with_input(root.path(), &["hash-object", "-w", "--stdin"], content)?)?;
+    git(root.path(), &["update-index", "--add", "--cacheinfo", &format!("{mode},{},{}", sha.trim(), path.as_str())]).map(|_| ())
+}
+
+/// Short `git diff --cached --stat` of what is staged right now.
+pub fn staged_stat(root: &RepoRoot) -> Result<String> {
+    git_str(root.path(), &["diff", "--cached", "--stat"])
+}
+
+pub fn commit(root: &RepoRoot, message: &str) -> Result<String> {
+    git_with_input(root.path(), &["commit", "-q", "-F", "-"], message.as_bytes())?;
+    git_str(root.path(), &["rev-parse", "--short", "HEAD"])
 }

@@ -3,9 +3,12 @@
   import { app } from '../state.svelte';
   import ActivityPanel from './ActivityPanel.svelte';
   import ChatPanel from './ChatPanel.svelte';
+  import FindingsPanel from './FindingsPanel.svelte';
+  import { submitReview } from '../review-actions';
   import NewThread from './NewThread.svelte';
   import ThreadCard from './ThreadCard.svelte';
 
+  const openFindings = $derived((app.snap?.findings ?? []).filter((f) => f.status === 'open').length);
   const visible = $derived.by(() => {
     const all = app.snap?.threads ?? [];
     const v = app.view;
@@ -23,6 +26,7 @@
     <nav class="tabs right-tabs">
       <button class:active={app.rightTab === 'discussions'} onclick={() => (app.rightTab = 'discussions')}>Discussions</button>
       <button class:active={app.rightTab === 'chat'} onclick={() => (app.rightTab = 'chat')}>Chat{#if app.snap?.chatBusy} <span class="spinner"></span>{/if}</button>
+      <button class:active={app.rightTab === 'findings'} onclick={() => (app.rightTab = 'findings')}>Findings{#if openFindings} <span class="count">{openFindings}</span>{/if}</button>
     </nav>
     <span class="spacer"></span>
     {#if app.rightTab === 'discussions'}
@@ -30,8 +34,17 @@
       <button onclick={() => openComposer()} title="c">New</button>
     {/if}
   </header>
+  {#if app.pendingReview && app.rightTab === 'discussions'}
+    <div class="submit-bar row">
+      <span>{app.pendingReview} comment(s) in your pending review</span>
+      <span class="spacer"></span>
+      <button class="primary small" onclick={submitReview} title="Send all pending comments to the AI as one task">Submit review</button>
+    </div>
+  {/if}
   {#if app.rightTab === 'chat'}
     <ChatPanel />
+  {:else if app.rightTab === 'findings'}
+    <FindingsPanel />
   {:else}
   <div class="threads-body">
     <ActivityPanel />

@@ -3,6 +3,7 @@
   import { keyOf } from '../keys';
   import { findReferences, gotoDefinition, lspUsable } from '../lsp';
   import { app } from '../state.svelte';
+  import { reviewWithAi } from '../review-actions';
 
   const m = $derived(app.menu!);
   const lsp = $derived(m.side === 'new' && lspUsable(m.path));
@@ -28,6 +29,7 @@
     <button disabled={m.side !== 'new'} onclick={() => act(() => editFile(m.path, m.line))}>Edit here <kbd>e</kbd></button>
     {#if app.view?.kind === 'chunk' || app.view?.kind === 'file' || app.view?.kind === 'later'}
       <button onclick={() => act(ask)}>Ask AI about this…</button>
+      <button onclick={() => act(() => reviewWithAi({ kind: 'lines', path: m.path, side: m.side, start: m.line, end: m.line }))}>AI review this line</button>
     {/if}
     {#if !lsp && m.side === 'new' && m.path.endsWith('.rs')}<div class="muted small menu-note">rust-analyzer: {app.lsp.state}</div>{/if}
   </div>

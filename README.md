@@ -60,18 +60,32 @@ Nothing is committed, ever. The AI only edits your working tree, and only when y
 
 **Reviewing**
 - Queue of AI-planned steps (or plain file by file), with a "Done" list and progress everywhere.
-- Side-by-side or unified diff (added and deleted files are always unified), with syntax highlighting.
+- Side-by-side or unified diff (added and deleted files are always unified), with syntax highlighting
+  and word-level highlights of what changed inside a line. Whitespace-only changes can be ignored.
+- More context on demand: 20 more lines above or below a hunk, or the whole enclosing function
+  (via rust-analyzer, with a guess for other languages).
 - Per-line marks: click the gutter dot to toggle a line, drag in the gutter to select a range, then
   accept, put off for later or reset, using the keyboard or the floating bar.
 - "Later" tab: everything you put off, lines and discussions, to come back to at the end.
 - File tree with per-file and per-folder progress. Files currently on screen are highlighted, and
   the file under your pointer is highlighted more subtly.
-- Sticky file bar while scrolling, with one-click "Accept file" / "Accept this part".
+- Sticky file bar while scrolling, with one-click "Accept file" / "Accept this part". Accepted files
+  collapse, and anything accepted can be taken back ("↺ Unaccept" on a hunk, file or step, also from
+  the Done list). Jump between files with `f` / `Shift+F`.
 - Back / forward navigation (⌘− / ⌘+), undo for marks, "Start over".
 
+**From review to commit**
+- Optionally **stage what you accept**. Accepted lines go to the git index, including parts of files,
+  and nothing else does, so you can commit exactly what you reviewed. Choose it on the start screen
+  (for uncommitted changes); everything previously staged is unstaged first.
+- **Commit** dialog with an AI-suggested message for what is staged.
+- **Export** the review (progress, summary, discussions, open findings) as markdown.
+
 **Talking to the AI**
-- Discussions anchored to lines, with three actions:
+- Discussions anchored to lines, with four actions:
   - **Note**: just for you.
+  - **Add to review**: collect comments, then **Submit review** sends them all to the AI as one task,
+    like a GitHub review.
   - **Ask now**: the AI answers now.
   - **Add AI to-do**: queued background work; its changes land at the end of the queue.
 - Live **AI activity** panel showing what the AI is doing (files read, edits, commands), with **Stop**.
@@ -85,6 +99,14 @@ Nothing is committed, ever. The AI only edits your working tree, and only when y
   in `.claude/skills`, `.agents/skills`, `.codex/skills` and `.github/skills`. Whatever the chosen CLI
   does not read by itself is added to the prompt. Your own standing instructions from Settings come on top.
 - Answers are instructed to be short and strictly on topic.
+
+**Catching slop**
+- **AI review** of the whole change, one step, or selected lines. The AI acts as a strict reviewer and
+  reports findings (bugs, edge cases, swallowed errors, dead code, made-up APIs…) next to the code
+  and in a Findings tab, with **Fix**, **Fix all**, **Discuss** and **Dismiss**.
+- Lock files and generated code (`Cargo.lock`, `package-lock.json`, `*.min.js`, `dist/**`…) are left
+  out of AI planning, reviews and summaries by default; the patterns are configurable in Settings.
+- **cargo fmt**, **cargo clippy** (warnings become findings) and **cargo clippy --fix** from the Tools menu.
 
 **Code navigation and editing**
 - rust-analyzer integration: hover, ⌘-click go to definition, right-click find references. If the

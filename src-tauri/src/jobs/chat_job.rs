@@ -25,7 +25,7 @@ pub fn spawn_chat_job(app: AppHandle, req: ChatRequest, title: String) {
             let (prompt, mode) = match req {
                 ChatRequest::Summary => {
                     s.summary_busy = true;
-                    (ai::build_summary_prompt(&s, &extra), AccessMode::ReadOnly)
+                    (ai::build_summary_prompt(&s, &extra, &state.settings.skip_filter()), AccessMode::ReadOnly)
                 }
                 ChatRequest::Message { allow_edits } => {
                     s.chat_busy = true;

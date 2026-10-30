@@ -4,4 +4,7 @@ pub mod domain;
 pub mod git;
 pub mod lsp;
 pub mod review;
+pub mod skip;
+pub mod stage;
 pub mod store;
+pub mod tools;

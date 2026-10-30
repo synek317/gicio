@@ -18,7 +18,7 @@ use std::path::PathBuf;
 async fn main() -> anyhow::Result<()> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let backend = AiBackend::default();
-    let mut s = Session::open(&PathBuf::from(&args[0]), GitRef::new(&args[1])?, backend.clone())?;
+    let mut s = Session::open(&PathBuf::from(&args[0]), GitRef::new(&args[1])?, backend.clone(), gicio_core::stage::StageMode::Memory)?;
     match args.get(2).map(String::as_str) {
         Some("plan") => {
             let req = ai::PlanRequest {
@@ -85,7 +85,7 @@ async fn main() -> anyhow::Result<()> {
             let ask_log = std::mem::take(&mut *logs.lock().unwrap());
             eprintln!("answered");
 
-            let prompt = ai::build_summary_prompt(&s, &Default::default());
+            let prompt = ai::build_summary_prompt(&s, &Default::default(), &Default::default());
             let summary = ai::run_streaming(&backend, &s.state.repo, &prompt, AccessMode::ReadOnly, sink(&logs), None).await?;
             s.state.summary = Some(Message::new(Author::Ai { backend: backend.label() }, MessageKind::Text, summary.trim()));
             logs.lock().unwrap().clear();
@@ -108,6 +108,34 @@ async fn main() -> anyhow::Result<()> {
             ]);
             s.save()?;
             std::fs::write(&args[3], serde_json::to_vec(&serde_json::json!({"snapshot": s.snapshot(), "texts": texts, "jobs": jobs}))?)?;
+        }
+        Some("stage") => {
+            // Re-open in index mode and accept every other added line of src/store.rs.
+            let backend = s.state.backend.clone();
+            let mut s = Session::open(&PathBuf::from(&args[0]), GitRef::new(&args[1])?, backend, gicio_core::stage::StageMode::Index)?;
+            let path = gicio_core::domain::FilePath::new("src/store.rs")?;
+            let keys: Vec<_> = s.file(&path).unwrap().hunks.iter().flat_map(|h| h.lines.iter())
+                .filter_map(|l| l.review_pos()).filter(|(side, _)| *side == Side::New).step_by(2)
+                .map(|(side, line)| gicio_core::review::LineKey { path: path.clone(), side, line }).collect();
+            println!("accepting {} lines", keys.len());
+            s.set_marks(keys, Some(gicio_core::review::MarkStatus::Accepted));
+            let out = std::process::Command::new("git").arg("-C").arg(&args[0]).args(["diff", "--cached", "--stat"]).output()?;
+            println!("{}", String::from_utf8_lossy(&out.stdout));
+            let out = std::process::Command::new("git").arg("-C").arg(&args[0]).args(["diff", "--cached", "--", "src/store.rs"]).output()?;
+            println!("{}", String::from_utf8_lossy(&out.stdout).lines().take(30).collect::<Vec<_>>().join("\n"));
+        }
+        Some("aireview") => {
+            let refs: Vec<_> = s.state.chunks[0].hunks.clone();
+            let paths = refs.iter().map(|r| r.path.clone()).collect();
+            let prompt = ai::build_ai_review_prompt(&s, &refs, None, &Default::default());
+            let answer = ai::run(&backend, &s.state.repo, &prompt, AccessMode::ReadOnly).await?;
+            let raw = ai::parse_findings(&answer).ok_or_else(|| anyhow::anyhow!("unparsable: {answer}"))?;
+            let n = s.add_ai_findings(raw, &paths);
+            for f in &s.state.findings {
+                println!("[{:?}] {}:{} {} — {}", f.severity, f.path, f.line, f.title, f.detail);
+            }
+            println!("{n} findings");
+            s.save()?;
         }
         Some("edit") => {
             let path = gicio_core::domain::FilePath::new("src/main.rs")?;

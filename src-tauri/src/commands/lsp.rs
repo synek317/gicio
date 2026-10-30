@@ -1,7 +1,7 @@
 use crate::publish::err;
 use crate::state::{AppState, LspSlot};
 use gicio_core::domain::{FilePath, RepoRoot};
-use gicio_core::lsp::{LspStatus, RustAnalyzer, SourceLocation};
+use gicio_core::lsp::{LspStatus, RustAnalyzer, SourceLocation, Symbol};
 use std::sync::Arc;
 use tauri::{AppHandle, Manager, State};
 
@@ -48,4 +48,10 @@ pub async fn lsp_definition(state: State<'_, AppState>, path: FilePath, line: u3
 pub async fn lsp_references(state: State<'_, AppState>, path: FilePath, line: u32, character: u32) -> Result<Vec<SourceLocation>, String> {
     let ra = state.lsp().ok_or("rust-analyzer is not running")?;
     ra.references(&path, line, character).await.map_err(err)
+}
+
+#[tauri::command]
+pub async fn lsp_symbols(state: State<'_, AppState>, path: FilePath) -> Result<Vec<Symbol>, String> {
+    let ra = state.lsp().ok_or("rust-analyzer is not running")?;
+    ra.symbols(&path).await.map_err(err)
 }

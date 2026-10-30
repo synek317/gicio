@@ -1,8 +1,11 @@
 pub mod chat;
+pub mod git_ops;
 pub mod jobs;
 pub mod lsp;
 pub mod marks;
 pub mod plan;
+pub mod review;
 pub mod session;
 pub mod threads;
+pub mod tools;
 pub mod settings;

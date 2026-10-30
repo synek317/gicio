@@ -2,14 +2,14 @@
   import { revealThread } from '../actions';
   import { api } from '../api';
   import { app } from '../state.svelte';
-  import type { JobInfo } from '../types';
+  import type { JobInfo, JobKind } from '../types';
   import JobLog from './JobLog.svelte';
 
   const active = $derived(app.jobs.filter((j) => j.status === 'running' || j.status === 'queued'));
   const recent = $derived(app.jobs.filter((j) => j.status !== 'running' && j.status !== 'queued').slice(-5).reverse());
   let showRecent = $state(false);
   let open = $state<Record<string, boolean>>({});
-  const icon = { ask: '💬', todo: '📋', plan: '🗺', chat: '🗨', summary: '📝' };
+  const icon: Record<JobKind, string> = { ask: '💬', todo: '📋', plan: '🗺', chat: '🗨', summary: '📝', review: '✉️', aiReview: '🔎', fix: '🛠', commit: '✔', tool: '⚙' };
 
   function stop(j: JobInfo) {
     api.cancelJob(j.id).catch((e) => app.toast(String(e), 'error'));

@@ -34,10 +34,10 @@ pub fn build_chat_prompt(s: &Session, extra: &ExtraInstructions, allow_edits: bo
 }
 
 /// One-shot summary of the whole change for the reviewer.
-pub fn build_summary_prompt(s: &Session, extra: &ExtraInstructions) -> String {
+pub fn build_summary_prompt(s: &Session, extra: &ExtraInstructions, skip: &crate::skip::SkipFilter) -> String {
     let mut out = String::from("A human is about to review (or is reviewing) the code change below. Summarize it for them.\n");
     out.push_str(&change_overview(s));
-    out.push_str(&format!("\nThe diff:\n```diff\n{}```\n", change_diff(s)));
+    out.push_str(&format!("\nThe diff:\n```diff\n{}```\n", change_diff(s, skip)));
     out.push_str(&instructions_prompt(&s.state.repo, &s.state.backend.engine, extra));
     out.push_str(
         "\nWrite the summary as markdown with these sections, each a few bullets at most:\n\
