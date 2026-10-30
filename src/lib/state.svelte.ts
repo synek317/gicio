@@ -1,0 +1,132 @@
+import { changedKeys, keyOf } from './keys';
+import { hunksProgress, type Progress } from './progress';
+import { sliceHunk } from './slice';
+import type { AnchorInput, Chunk, FileDiff, Hunk, JobInfo, LspStatus, MarkStatus, Note, Snapshot, SourceLocation, Thread } from './types';
+
+export type View =
+  | { kind: 'chunk'; id: string }
+  | { kind: 'later' }
+  | { kind: 'file'; path: string }
+  | { kind: 'source'; title: string; absPath: string; repoPath: string | null; line: number | null }
+  | { kind: 'refs'; title: string; locs: SourceLocation[] };
+export interface HistoryEntry { view: View; scroll: number }
+export interface Toast { id: number; text: string; kind: 'info' | 'error' }
+export interface HoverInfo { x: number; y: number; text: string }
+export interface ContextMenu { x: number; y: number; path: string; side: 'old' | 'new'; line: number; character: number }
+
+/** All UI state; the backend snapshot is the source of truth for review data. */
+class AppState {
+  snap = $state<Snapshot | null>(null);
+  view = $state<View | null>(null);
+  history = $state<HistoryEntry[]>([]);
+  future = $state<HistoryEntry[]>([]);
+  layout = $state<'split' | 'unified'>('split');
+  selection = $state<string[]>([]);
+  selAnchor = $state<string | null>(null);
+  focusedHunk = $state<string | null>(null);
+  composer = $state<{ anchor: AnchorInput | null; chunk: string | null } | null>(null);
+  activeThread = $state<string | null>(null);
+  sidebarTab = $state<'queue' | 'files' | 'later'>('queue');
+  showAllThreads = $state(false);
+  rightTab = $state<'discussions' | 'chat'>('discussions');
+  showHelp = $state(false);
+  lsp = $state<LspStatus>({ state: 'off' });
+  toasts = $state<Toast[]>([]);
+  hover = $state<HoverInfo | null>(null);
+  menu = $state<ContextMenu | null>(null);
+  editorDirty = $state(false);
+  jobs = $state<JobInfo[]>([]);
+  /** Files whose diff blocks are on screen (path -> count) and the file under the pointer. */
+  onScreen = $state<Record<string, number>>({});
+  hoverPath = $state<string | null>(null);
+
+  marks = $derived(new Map<string, MarkStatus>((this.snap?.marks ?? []).map((m) => [keyOf(m.path, m.side, m.line), m.status])));
+  hunks = $derived(new Map<string, Hunk>((this.snap?.files ?? []).flatMap((f) => f.hunks.map((h) => [h.id, h] as const))));
+  files = $derived(new Map<string, FileDiff>((this.snap?.files ?? []).map((f) => [f.path, f])));
+  selSet = $derived(new Set(this.selection));
+
+  viewHunks = $derived.by((): Hunk[] => {
+    const v = this.view;
+    if (!v || !this.snap) return [];
+    if (v.kind === 'chunk') {
+      const c = this.chunk(v.id);
+      return c ? this.chunkHunks(c) : [];
+    }
+    if (v.kind === 'file') return this.files.get(v.path)?.hunks ?? [];
+    if (v.kind === 'later') return this.snap.files.flatMap((f) => f.hunks).filter((h) => changedKeys(h).some((k) => this.marks.get(k) === 'deferred'));
+    return [];
+  });
+  viewHunkMap = $derived(new Map(this.viewHunks.map((h) => [h.id, h])));
+
+  /** Changed lines of the current view in reading order; drives range selection. */
+  orderedKeys = $derived(this.viewHunks.flatMap(changedKeys));
+
+  overall = $derived(hunksProgress(this.snap?.files.flatMap((f) => f.hunks) ?? [], this.marks));
+
+  /** `${path}|${side}|${line}` -> threads anchored there, for gutter markers. */
+  threadLines = $derived.by(() => {
+    const m = new Map<string, Thread[]>();
+    for (const t of this.snap?.threads ?? []) {
+      const a = t.anchor;
+      if (!a) continue;
+      for (let l = a.start; l <= a.end; l++) {
+        const k = `${a.path}|${a.side}|${l}`;
+        m.set(k, [...(m.get(k) ?? []), t]);
+      }
+    }
+    return m;
+  });
+
+  /** `${path}|${side}|${line}` -> AI notes from the plan. */
+  noteLines = $derived.by(() => {
+    const m = new Map<string, Note[]>();
+    for (const c of this.snap?.chunks ?? [])
+      for (const n of c.notes ?? []) {
+        const k = `${n.path}|${n.side}|${n.line}`;
+        m.set(k, [...(m.get(k) ?? []), n]);
+      }
+    return m;
+  });
+
+  chunk(id: string): Chunk | undefined {
+    return this.snap?.chunks.find((c) => c.id === id);
+  }
+
+  chunkHunks(c: Chunk): Hunk[] {
+    return c.hunks.flatMap((r) => {
+      const h = this.hunks.get(r.id);
+      return h ? [sliceHunk(h, r)] : [];
+    });
+  }
+
+  chunkProgress(c: Chunk): Progress {
+    return hunksProgress(this.chunkHunks(c), this.marks);
+  }
+
+  applySnapshot(s: Snapshot) {
+    const cur = this.snap;
+    if (cur && cur.baseCommit === s.baseCommit && cur.repo === s.repo && s.version < cur.version) return;
+    this.snap = s;
+    if (this.view?.kind === 'chunk' && !this.chunk(this.view.id)) this.view = s.chunks[0] ? { kind: 'chunk', id: s.chunks[0].id } : null;
+    if (!this.view && s.chunks[0]) this.view = { kind: 'chunk', id: s.chunks[0].id };
+    if (this.focusedHunk && !this.viewHunkMap.has(this.focusedHunk)) this.focusedHunk = null;
+    const live = new Set(this.orderedKeys);
+    if (this.selection.some((k) => !live.has(k))) this.selection = this.selection.filter((k) => live.has(k));
+  }
+
+  jobLog(id: string, line: string) {
+    this.jobs = this.jobs.map((j) => (j.id === id ? { ...j, log: [...j.log.slice(-399), line] } : j));
+  }
+
+  jobForThread(thread: string): JobInfo | undefined {
+    return this.jobs.findLast((j) => j.thread === thread && (j.status === 'running' || j.status === 'queued'));
+  }
+
+  toast(text: string, kind: Toast['kind'] = 'info') {
+    const id = Date.now() + Math.random();
+    this.toasts = [...this.toasts, { id, text, kind }];
+    setTimeout(() => (this.toasts = this.toasts.filter((t) => t.id !== id)), kind === 'error' ? 9000 : 3500);
+  }
+}
+
+export const app = new AppState();
