@@ -1,9 +1,9 @@
 use crate::ai::login_path;
 use crate::domain::{FilePath, RepoRoot};
+use crate::process::async_command;
 use anyhow::{bail, Context, Result};
 use serde_json::Value;
 use std::path::Path;
-use tokio::process::Command;
 
 pub struct ClippyDiagnostic {
     pub path: FilePath,
@@ -18,7 +18,7 @@ async fn cargo(root: &RepoRoot, args: &[&str]) -> Result<std::process::Output> {
     if !root.path().join("Cargo.toml").exists() {
         bail!("not a Cargo project (no Cargo.toml at the repository root)");
     }
-    Command::new("cargo").args(args).current_dir(root.path()).env("PATH", login_path()).output().await.context("failed to run cargo")
+    async_command("cargo").args(args).current_dir(root.path()).env("PATH", login_path()).output().await.context("failed to run cargo")
 }
 
 fn tail(bytes: &[u8]) -> String {

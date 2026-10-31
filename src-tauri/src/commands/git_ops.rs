@@ -15,8 +15,7 @@ pub fn staged_stat(state: State<'_, AppState>) -> Result<String, String> {
 pub async fn suggest_commit_message(app: AppHandle, state: State<'_, AppState>) -> Result<String, String> {
     let (prompt, backend, repo) = {
         let s = state.session()?;
-        let staged = std::process::Command::new("git").arg("-C").arg(s.state.repo.path()).args(["diff", "--cached"]).output().map_err(err)?;
-        let staged = String::from_utf8_lossy(&staged.stdout).to_string();
+        let staged = git::staged_diff(&s.state.repo).map_err(err)?;
         if staged.trim().is_empty() {
             return Err("nothing is staged".into());
         }

@@ -1,4 +1,5 @@
 use super::transport::{read_message, write_message};
+use crate::process::async_command;
 use anyhow::{anyhow, Context, Result};
 use serde::Serialize;
 use serde_json::{json, Value};
@@ -9,7 +10,7 @@ use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::{Arc, Mutex as StdMutex};
 use std::time::Duration;
 use tokio::io::BufReader;
-use tokio::process::{Child, ChildStdin, Command};
+use tokio::process::{Child, ChildStdin};
 use tokio::sync::{oneshot, Mutex};
 
 #[derive(Debug, Clone, Serialize)]
@@ -35,7 +36,7 @@ pub struct LspClient {
 
 impl LspClient {
     pub fn spawn(program: &Path, path_env: &str, cwd: &Path) -> Result<Self> {
-        let mut child = Command::new(program)
+        let mut child = async_command(program)
             .env("PATH", path_env)
             .current_dir(cwd)
             .stdin(Stdio::piped())

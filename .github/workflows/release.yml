@@ -1,0 +1,130 @@
+name: Release
+
+# Pushing a `v*` tag (e.g. `v0.2.0`, matching the version in tauri.conf.json) builds gicio for
+# macOS (Apple silicon), Linux and Windows, publishes a GitHub release with the installers and
+# updates the Homebrew formula. Running the workflow by hand only builds the artifacts.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build (${{ matrix.target }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            bundles: app,dmg
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            bundles: deb,rpm,appimage
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            bundles: msi,nsis
+    runs-on: ${{ matrix.os }}
+    env:
+      TARGET: ${{ matrix.target }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Read the version
+        id: version
+        shell: bash
+        run: echo "version=$(node -p "require('./src-tauri/tauri.conf.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Check that the tag matches the version
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: |
+          if [ "$GITHUB_REF_NAME" != "v${{ steps.version.outputs.version }}" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match version ${{ steps.version.outputs.version }} in tauri.conf.json"
+            exit 1
+          fi
+
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: ./.github/scripts/install-linux-deps.sh
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+
+      - run: npm ci
+
+      - name: Build
+        run: npx tauri build --target ${{ matrix.target }} --bundles ${{ matrix.bundles }}
+
+      - name: Collect artifacts
+        shell: bash
+        run: ./.github/scripts/collect-artifacts.sh "${{ steps.version.outputs.version }}" dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gicio-${{ matrix.target }}
+          path: dist/*
+          if-no-files-found: error
+
+  release:
+    name: Publish the release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    outputs:
+      mac_sha256: ${{ steps.sums.outputs.mac_sha256 }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Checksums
+        id: sums
+        working-directory: dist
+        run: |
+          sha256sum * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+          echo "mac_sha256=$(sha256sum gicio-*-aarch64-apple-darwin.tar.gz | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --title "gicio ${GITHUB_REF_NAME#v}" --generate-notes
+
+  homebrew:
+    name: Update the Homebrew formula
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+
+      - name: Write Formula/gicio.rb
+        run: |
+          mkdir -p Formula
+          ./.github/scripts/homebrew-formula.sh "${GITHUB_REF_NAME#v}" "${{ needs.release.outputs.mac_sha256 }}" > Formula/gicio.rb
+          cat Formula/gicio.rb
+
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Formula/gicio.rb
+          git diff --cached --quiet && exit 0
+          git commit -m "Homebrew: gicio ${GITHUB_REF_NAME#v}"
+          git push

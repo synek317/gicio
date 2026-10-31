@@ -30,7 +30,8 @@ impl RepoRoot {
     /// Converts an absolute path inside the repo into a repo-relative one.
     pub fn relative(&self, abs: &Path) -> Option<FilePath> {
         let rel = abs.strip_prefix(&self.0).ok()?;
-        FilePath::new(rel.to_str()?).ok()
+        let parts: Option<Vec<&str>> = rel.components().map(|c| c.as_os_str().to_str()).collect();
+        FilePath::new(&parts?.join("/")).ok()
     }
 }
 

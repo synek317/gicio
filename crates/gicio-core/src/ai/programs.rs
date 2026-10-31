@@ -1,34 +1,60 @@
 //! Finding CLI binaries. A GUI app started from Finder gets a minimal PATH, so we borrow
 //! the user's login-shell PATH and look in the usual install locations.
 
+use std::ffi::OsString;
 use std::path::PathBuf;
-use std::process::Command;
 use std::sync::OnceLock;
+
+fn home() -> PathBuf {
+    std::env::home_dir().unwrap_or_default()
+}
+
+/// `~/…` → absolute.
+fn expand_home(p: &str) -> PathBuf {
+    match p.strip_prefix("~/") {
+        Some(rest) => home().join(rest),
+        None => PathBuf::from(p),
+    }
+}
+
+/// PATH as the user's login shell sets it (empty where there is no such thing, i.e. Windows).
+fn login_shell_path() -> Vec<PathBuf> {
+    if cfg!(windows) {
+        return Vec::new();
+    }
+    let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/sh".into());
+    crate::process::sync_command(shell)
+        .args(["-lc", "printf %s \"$PATH\""])
+        .output()
+        .ok()
+        .filter(|o| o.status.success())
+        .map(|o| std::env::split_paths(&OsString::from(String::from_utf8_lossy(&o.stdout).as_ref())).collect())
+        .unwrap_or_default()
+}
+
+/// Where CLIs usually get installed, in case PATH misses them.
+fn usual_dirs() -> Vec<PathBuf> {
+    let home = home();
+    let mut dirs: Vec<PathBuf> = [".local/bin", ".claude/local", ".npm-global/bin", ".cargo/bin", ".bun/bin", ".volta/bin"].iter().map(|d| home.join(d)).collect();
+    if cfg!(windows) {
+        dirs.extend(std::env::var_os("APPDATA").map(|d| PathBuf::from(d).join("npm")));
+    } else {
+        dirs.extend(["/opt/homebrew/bin", "/home/linuxbrew/.linuxbrew/bin", "/usr/local/bin"].map(PathBuf::from));
+    }
+    dirs
+}
 
 pub fn login_path() -> &'static str {
     static PATH: OnceLock<String> = OnceLock::new();
     PATH.get_or_init(|| {
-        let current = std::env::var("PATH").unwrap_or_default();
-        let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".into());
-        let login = Command::new(shell)
-            .args(["-lc", "printf %s \"$PATH\""])
-            .output()
-            .ok()
-            .filter(|o| o.status.success())
-            .map(|o| String::from_utf8_lossy(&o.stdout).to_string())
-            .unwrap_or_default();
-        let home = std::env::var("HOME").unwrap_or_default();
-        let extra = [".local/bin", ".claude/local", ".npm-global/bin", ".cargo/bin", ".bun/bin", ".volta/bin"]
-            .iter()
-            .map(|d| format!("{home}/{d}"))
-            .chain(["/opt/homebrew/bin".into(), "/usr/local/bin".into()]);
-        let mut parts: Vec<String> = Vec::new();
-        for p in login.split(':').map(str::to_string).chain(current.split(':').map(str::to_string)).chain(extra) {
-            if !p.is_empty() && !parts.contains(&p) {
+        let current: Vec<PathBuf> = std::env::var_os("PATH").map(|p| std::env::split_paths(&p).collect()).unwrap_or_default();
+        let mut parts: Vec<PathBuf> = Vec::new();
+        for p in login_shell_path().into_iter().chain(current).chain(usual_dirs()) {
+            if !p.as_os_str().is_empty() && !parts.contains(&p) {
                 parts.push(p);
             }
         }
-        parts.join(":")
+        std::env::join_paths(parts).map(|p| p.to_string_lossy().into_owned()).unwrap_or_default()
     })
 }
 
@@ -41,8 +67,7 @@ const BUNDLED: &[(&str, &str)] = &[
 
 /// Newest `<dir>/<version>/<name>` (the GitHub Copilot app downloads its CLI into a version cache).
 fn newest_versioned(dir: &str, name: &str) -> Option<PathBuf> {
-    let home = std::env::var("HOME").unwrap_or_default();
-    let mut found: Vec<(Vec<u64>, PathBuf)> = std::fs::read_dir(dir.replacen('~', &home, 1))
+    let mut found: Vec<(Vec<u64>, PathBuf)> = std::fs::read_dir(expand_home(dir))
         .ok()?
         .flatten()
         .map(|e| e.path().join(name))
@@ -56,17 +81,39 @@ fn newest_versioned(dir: &str, name: &str) -> Option<PathBuf> {
     found.pop().map(|(_, p)| p)
 }
 
+/// File names a program can have: on Windows `claude.exe`, or `claude.cmd` for npm shims.
+fn file_names(name: &str) -> Vec<String> {
+    if cfg!(windows) { ["exe", "cmd", "bat"].iter().map(|ext| format!("{name}.{ext}")).collect() } else { vec![name.to_string()] }
+}
+
 /// `GICIO_<NAME>_BIN` overrides; then the extended PATH; then CLIs bundled in desktop apps.
 pub fn resolve_program(name: &str) -> Option<PathBuf> {
     let var = format!("GICIO_{}_BIN", name.to_uppercase().replace('-', "_"));
     if let Ok(p) = std::env::var(var) {
         return Some(PathBuf::from(p));
     }
-    let home = std::env::var("HOME").unwrap_or_default();
-    login_path()
-        .split(':')
-        .map(|d| PathBuf::from(d).join(name))
-        .chain(BUNDLED.iter().filter(|(n, _)| *n == name).map(|(_, p)| PathBuf::from(p.replacen('~', &home, 1))))
+    let names = file_names(name);
+    std::env::split_paths(login_path())
+        .flat_map(|d| names.iter().map(move |n| d.join(n)))
+        .chain(BUNDLED.iter().filter(|(n, _)| *n == name).map(|(_, p)| expand_home(p)))
         .find(|p| p.is_file())
         .or_else(|| if name == "copilot" { newest_versioned("~/Library/Caches/github-copilot-sdk/cli", "copilot") } else { None })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn login_path_keeps_the_current_path() {
+        let path: Vec<PathBuf> = std::env::split_paths(login_path()).collect();
+        for p in std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default()).filter(|p| !p.as_os_str().is_empty()) {
+            assert!(path.contains(&p), "{} missing", p.display());
+        }
+    }
+
+    #[test]
+    fn finds_git() {
+        assert!(resolve_program("git").is_some());
+    }
 }

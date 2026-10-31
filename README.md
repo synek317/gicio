@@ -141,18 +141,82 @@ Nothing is committed, ever. The AI only edits your working tree, and only when y
 The screenshots show a review of doppio (`cargo install doppio-bar`), a small macOS menu bar app,
 done with Claude Code. All AI texts in them are real output.
 
-## Running
+## Installation
 
-Requirements: Rust, Node.js (the frontend is built automatically), `git`, and at least one of `claude`,
-`codex` or `copilot` on your PATH. For Rust projects, `rust-analyzer` enables code navigation.
+gicio runs on macOS (Apple silicon), Linux and Windows. Whichever way you install it, it needs `git`
+and at least one of `claude`, `codex` or `copilot` (or your own command, see [Running](#running)).
+For Rust projects, `rust-analyzer` enables code navigation.
 
-Install:
+Ready-made builds are on the [Releases](https://github.com/synek317/gicio/releases) page.
+
+### macOS (Apple silicon)
+
+With [Homebrew](https://brew.sh):
 
 ```sh
-cargo install --git https://github.com/synek317/gicio gicio
+brew tap synek317/gicio https://github.com/synek317/gicio
+brew trust --formula synek317/gicio/gicio
+brew install synek317/gicio/gicio
 ```
 
-Then run it inside the repository you want to review:
+and later `brew upgrade gicio`. `brew trust` is needed since Homebrew 7, which ignores formulae from
+other taps until you trust them. This installs the `gicio` command; start it from a terminal.
+
+Or download `gicio_<version>_aarch64.dmg` from the releases and drag gicio to Applications. The app
+is not signed with an Apple developer certificate, so macOS says it "is damaged" or "cannot be
+verified". Remove the quarantine flag once, after copying it:
+
+```sh
+xattr -dr com.apple.quarantine /Applications/gicio.app
+```
+
+### Linux (x86_64)
+
+From the releases, pick one:
+
+- **Debian, Ubuntu**: `sudo apt install ./gicio_<version>_amd64.deb`
+- **Fedora, openSUSE**: `sudo dnf install ./gicio-<version>-1.x86_64.rpm`
+- **anything else**: `gicio_<version>_amd64.AppImage` (`chmod +x` it and run it)
+
+The packages install the `gicio` command and a desktop entry. They need WebKitGTK 4.1, which the
+package manager pulls in (Ubuntu 22.04, Debian 12, Fedora 36 or newer).
+
+### Windows (x64)
+
+From the releases, run `gicio_<version>_x64-setup.exe` (or the `.msi`), then start gicio from the
+Start menu. There is also a portable `gicio-<version>-x86_64-pc-windows-msvc.zip` with just
+`gicio.exe`. It needs [WebView2](https://developer.microsoft.com/microsoft-edge/webview2/), which
+Windows 10 and 11 already have, and [Git for Windows](https://git-scm.com/download/win).
+
+### From source (any system)
+
+Requirements: Rust 1.88 or newer, Node.js 20.19 or newer (the frontend is built automatically), and on
+Linux the WebKitGTK development packages (see [`install-linux-deps.sh`](.github/scripts/install-linux-deps.sh)
+for Debian/Ubuntu, or the [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/)).
+`cargo install` builds the frontend and embeds it in the binary, and puts `gicio` into `~/.cargo/bin`.
+
+Straight from GitHub:
+
+```sh
+cargo install --git https://github.com/synek317/gicio gicio --locked
+```
+
+Or from a clone, which is handy for trying local changes or a branch:
+
+```sh
+git clone https://github.com/synek317/gicio
+cd gicio
+cargo install-local
+```
+
+`cargo install-local` is an alias (defined in [`.cargo/config.toml`](.cargo/config.toml)) for
+`cargo install --path src-tauri --locked --force`: the repository root is a workspace, so a plain
+`cargo install --path .` does not work there. Run it again after `git pull` to update. To try
+gicio without installing it, run `cargo run --release` in the clone.
+
+## Running
+
+Run gicio inside the repository you want to review:
 
 ```sh
 gicio                          # this repository, start screen prefilled
@@ -164,20 +228,19 @@ Tick "Remember these choices" on the start screen and `gicio` opens the review s
 then on. Everything the start screen asks (what to review, staging, order, AI) can be changed during a
 review from the **Start over ▾** menu, and the defaults in Settings → Preferences.
 
-Or run it from a clone:
-
-```sh
-cargo run --release
-```
-
-or install your local checkout with `cargo install-local` (an alias for
-`cargo install --path src-tauri --locked --force`).
-
 For working on gicio itself, `npm install && npm run tauri dev` gives hot reload, and
-`npm run tauri build` makes a macOS app bundle.
+`npm run tauri build` makes the installers for your system (a macOS app bundle, `.deb`/`.rpm`/AppImage,
+or `.msi`/setup `.exe`).
 
-If a CLI is not found (apps started from Finder get a minimal PATH), point gicio at it with
-`GICIO_CLAUDE_BIN`, `GICIO_CODEX_BIN`, `GICIO_COPILOT_BIN` or `GICIO_RUST_ANALYZER_BIN`.
+A custom AI command runs through `/bin/sh` (on Windows, `cmd.exe`). If a CLI is not found (apps
+started from Finder or the Start menu get a minimal PATH), point gicio at it with `GICIO_CLAUDE_BIN`,
+`GICIO_CODEX_BIN`, `GICIO_COPILOT_BIN` or `GICIO_RUST_ANALYZER_BIN`.
+
+### Releasing
+
+Bump the version in `src-tauri/Cargo.toml`, `src-tauri/tauri.conf.json` and `package.json`, then push a
+matching tag (`git tag v0.2.0 && git push origin v0.2.0`). The [Release](.github/workflows/release.yml)
+workflow builds all platforms, publishes a GitHub release and updates `Formula/gicio.rb` for Homebrew.
 
 Review state lives in `.git/gicio/` inside the reviewed repository, one review per scope (uncommitted
 changes, or everything since a ref), so you can close the app and continue later, also after commits

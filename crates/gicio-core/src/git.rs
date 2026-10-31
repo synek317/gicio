@@ -1,12 +1,12 @@
 //! Thin wrappers around the `git` CLI.
 
 use crate::domain::{CommitId, FilePath, GitRef, RepoRoot};
+use crate::process::sync_command;
 use anyhow::{bail, Context, Result};
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 fn git(dir: &Path, args: &[&str]) -> Result<Vec<u8>> {
-    let out = Command::new("git")
+    let out = sync_command("git")
         .arg("-C")
         .arg(dir)
         .args(args)
@@ -20,7 +20,7 @@ fn git(dir: &Path, args: &[&str]) -> Result<Vec<u8>> {
 
 fn git_with_input(dir: &Path, args: &[&str], input: &[u8]) -> Result<Vec<u8>> {
     use std::io::Write;
-    let mut child = Command::new("git")
+    let mut child = sync_command("git")
         .arg("-C")
         .arg(dir)
         .args(args)
@@ -102,8 +102,10 @@ pub fn changed_files(root: &RepoRoot, base: &CommitId) -> Result<Vec<ChangedFile
     Ok(files)
 }
 
+/// `path` at `commit` as it would look checked out (line endings converted like the working tree,
+/// e.g. CRLF with `core.autocrlf` on Windows), so it compares cleanly with the file on disk.
 pub fn show_file(root: &RepoRoot, commit: &CommitId, path: &FilePath) -> Result<Vec<u8>> {
-    git(root.path(), &["show", &format!("{}:{}", commit.as_str(), path.as_str())])
+    git(root.path(), &["cat-file", "--filters", &format!("{}:{}", commit.as_str(), path.as_str())])
 }
 
 /// Unstages everything (index back to HEAD), keeping the working tree.
@@ -120,10 +122,21 @@ pub fn remove_from_index(root: &RepoRoot, path: &FilePath) -> Result<()> {
     git(root.path(), &["rm", "--cached", "-q", "--ignore-unmatch", "--", path.as_str()]).map(|_| ())
 }
 
-/// Puts `content` into the index as `path` without touching the working tree.
+/// Puts `content` (working-tree form) into the index as `path` without touching the working tree.
+/// `--path` applies the same conversions as `git add` (e.g. CRLF back to LF).
 pub fn stage_content(root: &RepoRoot, path: &FilePath, mode: &str, content: &[u8]) -> Result<()> {
-    let sha = String::from_utf8(git_with_input(root.path(), &["hash-object", "-w", "--stdin"], content)?)?;
+    let sha = String::from_utf8(git_with_input(root.path(), &["hash-object", "-w", "--stdin", "--path", path.as_str()], content)?)?;
     git(root.path(), &["update-index", "--add", "--cacheinfo", &format!("{mode},{},{}", sha.trim(), path.as_str())]).map(|_| ())
+}
+
+/// Whether the index (or HEAD) records `path` as executable. For systems without an executable bit.
+pub fn executable_in_index(root: &RepoRoot, path: &FilePath) -> bool {
+    git_str(root.path(), &["ls-files", "--stage", "--", path.as_str()]).is_ok_and(|s| s.starts_with("100755"))
+}
+
+/// `git diff --cached` of what is staged right now.
+pub fn staged_diff(root: &RepoRoot) -> Result<String> {
+    Ok(String::from_utf8_lossy(&git(root.path(), &["diff", "--cached"])?).into_owned())
 }
 
 /// Short `git diff --cached --stat` of what is staged right now.

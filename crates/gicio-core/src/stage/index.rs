@@ -4,7 +4,6 @@ use crate::domain::{CommitId, FilePath, RepoRoot};
 use crate::git;
 use crate::review::{LineKey, Marks};
 use anyhow::Result;
-use std::os::unix::fs::PermissionsExt;
 
 /// Rewrites the index entries of `files` so the index holds exactly the accepted changes.
 pub fn sync_index(root: &RepoRoot, base: &CommitId, files: &[&FileDiff], marks: &Marks, opts: crate::diff::DiffOptions) -> Result<()> {
@@ -39,9 +38,17 @@ pub fn sync_index(root: &RepoRoot, base: &CommitId, files: &[&FileDiff], marks: 
     Ok(())
 }
 
+#[cfg(unix)]
 fn file_mode(root: &RepoRoot, path: &FilePath) -> &'static str {
+    use std::os::unix::fs::PermissionsExt;
     match std::fs::metadata(root.join(path)) {
         Ok(m) if m.permissions().mode() & 0o111 != 0 => "100755",
         _ => "100644",
     }
+}
+
+/// No executable bit on disk: keep what git already records.
+#[cfg(not(unix))]
+fn file_mode(root: &RepoRoot, path: &FilePath) -> &'static str {
+    if git::executable_in_index(root, path) { "100755" } else { "100644" }
 }

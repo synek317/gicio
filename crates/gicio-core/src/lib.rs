@@ -3,6 +3,7 @@ pub mod diff;
 pub mod domain;
 pub mod git;
 pub mod lsp;
+pub mod process;
 pub mod review;
 pub mod skip;
 pub mod stage;

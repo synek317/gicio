@@ -8,7 +8,7 @@
   import ToolsMenu from './ToolsMenu.svelte';
 
   const s = $derived(app.snap!);
-  const repoName = $derived(s.repo.split('/').pop());
+  const repoName = $derived(s.repo.split(/[\\/]/).pop());
   let showCommit = $state(false);
 </script>
 

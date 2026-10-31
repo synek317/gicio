@@ -2,6 +2,7 @@ use super::programs::{login_path, resolve_program};
 use super::{AccessMode, AiBackend, Engine};
 use crate::domain::RepoRoot;
 use anyhow::{anyhow, Result};
+use crate::process::async_command;
 use std::path::PathBuf;
 use tokio::process::Command;
 
@@ -29,7 +30,7 @@ pub struct Prepared {
 
 fn program(name: &str) -> Result<Command> {
     let path = resolve_program(name).ok_or_else(|| anyhow!("`{name}` not found on PATH (set GICIO_{}_BIN to override)", name.to_uppercase()))?;
-    let mut cmd = Command::new(path);
+    let mut cmd = async_command(path);
     cmd.env("PATH", login_path());
     Ok(cmd)
 }
@@ -37,6 +38,22 @@ fn program(name: &str) -> Result<Command> {
 fn temp_file(tag: &str) -> PathBuf {
     let nanos = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0);
     std::env::temp_dir().join(format!("gicio-{tag}-{}-{nanos}.txt", std::process::id()))
+}
+
+/// `command` run by the system shell.
+#[cfg(not(windows))]
+fn shell(command: &str) -> Command {
+    let mut c = async_command("/bin/sh");
+    c.arg("-c").arg(command);
+    c
+}
+
+/// `command` run by the system shell. Passed raw: cmd.exe does its own parsing, not the C runtime's.
+#[cfg(windows)]
+fn shell(command: &str) -> Command {
+    let mut c = async_command("cmd.exe");
+    c.arg("/d").arg("/s").arg("/c").raw_arg(format!("\"{command}\""));
+    c
 }
 
 /// Builds the CLI invocation for one non-interactive AI turn.
@@ -93,9 +110,8 @@ pub fn prepare(backend: &AiBackend, repo: &RepoRoot, prompt: &str, mode: AccessM
             Prepared { cmd: c, stdin: None, output: Output::Stdout }
         }
         Engine::Custom { command } => {
-            let mut c = Command::new("/bin/sh");
+            let mut c = shell(command.as_str());
             c.env("PATH", login_path());
-            c.arg("-c").arg(command.as_str());
             c.env("GICIO_MODE", if edit { "edit" } else { "read-only" });
             if let Some(m) = model {
                 c.env("GICIO_MODEL", m);

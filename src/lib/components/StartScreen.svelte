@@ -66,7 +66,7 @@
       </div>
     </label>
     {#if recent.recent.length}
-      <div class="chips">{#each recent.recent as r}<button class="chip" onclick={() => (recent.repo = r)} title={r}>{r.split('/').pop()}</button>{/each}</div>
+      <div class="chips">{#each recent.recent as r}<button class="chip" onclick={() => (recent.repo = r)} title={r}>{r.split(/[\\/]/).pop()}</button>{/each}</div>
     {/if}
 
     <ReviewOptions bind:options repo={recent.repo || null} idPrefix="start" />
