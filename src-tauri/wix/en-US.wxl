@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Code page 1250 instead of Tauri's default 1252: the publisher name contains "ń". -->
+<WixLocalization Culture="en-us" Codepage="1250" xmlns="http://schemas.microsoft.com/wix/2006/localization">
+  <String Id="TauriCodepage">1250</String>
+</WixLocalization>

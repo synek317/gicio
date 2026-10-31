@@ -35,6 +35,15 @@
     ],
     "publisher": "Marcin Sas-Szymański",
     "copyright": "Copyright 2026 Marcin Sas-Szymański",
-    "shortDescription": "Review huge changes with AI assist"
+    "shortDescription": "Review huge changes with AI assist",
+    "windows": {
+      "wix": {
+        "language": {
+          "en-US": {
+            "localePath": "wix/en-US.wxl"
+          }
+        }
+      }
+    }
   }
 }
