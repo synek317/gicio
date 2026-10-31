@@ -74,6 +74,7 @@ export async function gotoDefinition(path: string, line: number, col: number) {
 
 export async function findReferences(path: string, line: number, col: number) {
   app.hover = null;
+  if (app.lsp.state === 'indexing') app.toast('Waiting for rust-analyzer to load the whole project…');
   try {
     const locs = await api.lspReferences(path, line - 1, col);
     if (!locs.length) return app.toast('No references found');

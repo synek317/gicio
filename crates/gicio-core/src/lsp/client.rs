@@ -1,3 +1,5 @@
+use super::content_modified::{self, ContentModified};
+use super::readiness::Readiness;
 use super::transport::{read_message, write_message};
 use crate::process::async_command;
 use anyhow::{anyhow, Context, Result};
@@ -31,6 +33,7 @@ pub struct LspClient {
     pending: Pending,
     next_id: AtomicI64,
     status: Arc<StdMutex<LspStatus>>,
+    readiness: Readiness,
     _child: Child,
 }
 
@@ -49,8 +52,9 @@ impl LspClient {
         let stdout = child.stdout.take().context("no stdout")?;
         let pending: Pending = Arc::default();
         let status = Arc::new(StdMutex::new(LspStatus::Starting));
-        tokio::spawn(reader_loop(BufReader::new(stdout), stdin.clone(), pending.clone(), status.clone()));
-        Ok(Self { stdin, pending, next_id: AtomicI64::new(1), status, _child: child })
+        let readiness = Readiness::new();
+        tokio::spawn(reader_loop(BufReader::new(stdout), stdin.clone(), pending.clone(), status.clone(), readiness.clone()));
+        Ok(Self { stdin, pending, next_id: AtomicI64::new(1), status, readiness, _child: child })
     }
 
     pub fn status(&self) -> LspStatus {
@@ -75,12 +79,32 @@ impl LspClient {
         }
     }
 
+    /// Waits until the server has loaded the whole workspace.
+    pub async fn wait_until_loaded(&self, timeout: Duration) -> Result<()> {
+        self.readiness.wait(timeout).await
+    }
+
+    /// Like `request`, but asks again when the server cancels it because the content changed.
+    pub async fn request_retrying(&self, method: &str, params: Value, timeout: Duration) -> Result<Value> {
+        const ATTEMPTS: u32 = 5;
+        let mut attempt = 1;
+        loop {
+            match self.request(method, params.clone(), timeout).await {
+                Err(e) if e.is::<ContentModified>() && attempt < ATTEMPTS => {
+                    attempt += 1;
+                    tokio::time::sleep(Duration::from_millis(300)).await;
+                }
+                res => return res,
+            }
+        }
+    }
+
     pub async fn notify(&self, method: &str, params: Value) -> Result<()> {
         write_message(&mut *self.stdin.lock().await, &json!({"jsonrpc": "2.0", "method": method, "params": params})).await
     }
 }
 
-async fn reader_loop(mut reader: BufReader<tokio::process::ChildStdout>, stdin: Arc<Mutex<ChildStdin>>, pending: Pending, status: Arc<StdMutex<LspStatus>>) {
+async fn reader_loop(mut reader: BufReader<tokio::process::ChildStdout>, stdin: Arc<Mutex<ChildStdin>>, pending: Pending, status: Arc<StdMutex<LspStatus>>, readiness: Readiness) {
     let mut active_progress: HashMap<String, String> = HashMap::new();
     loop {
         let msg = match read_message(&mut reader).await {
@@ -99,6 +123,7 @@ async fn reader_loop(mut reader: BufReader<tokio::process::ChildStdout>, stdin: 
                 let Some(id) = id.as_i64() else { continue };
                 if let Some(tx) = pending.lock().unwrap().remove(&id) {
                     let res = match msg.get("error") {
+                        Some(e) if e.get("code").and_then(Value::as_i64) == Some(content_modified::CODE) => Err(ContentModified.into()),
                         Some(e) => Err(anyhow!("LSP error: {}", e.get("message").and_then(Value::as_str).unwrap_or("?"))),
                         None => Ok(msg.get("result").cloned().unwrap_or(Value::Null)),
                     };
@@ -130,15 +155,26 @@ async fn reader_loop(mut reader: BufReader<tokio::process::ChildStdout>, stdin: 
                     }
                     _ => {}
                 }
-                let mut s = status.lock().unwrap();
-                if !matches!(*s, LspStatus::Failed { .. } | LspStatus::Starting) {
-                    *s = match active_progress.values().next() {
-                        Some(t) => LspStatus::Indexing { detail: t.clone() },
-                        None => LspStatus::Ready,
-                    };
-                }
+                update_status(&status, &active_progress, &readiness);
+            }
+            (None, Some("experimental/serverStatus")) => {
+                readiness.set(msg.pointer("/params/quiescent").and_then(Value::as_bool).unwrap_or(false));
+                update_status(&status, &active_progress, &readiness);
             }
             _ => {}
         }
     }
+}
+
+/// Indexing while the workspace is loading or any progress is running, Ready otherwise.
+fn update_status(status: &StdMutex<LspStatus>, active_progress: &HashMap<String, String>, readiness: &Readiness) {
+    let mut s = status.lock().unwrap();
+    if matches!(*s, LspStatus::Failed { .. } | LspStatus::Starting) {
+        return;
+    }
+    *s = match active_progress.values().next() {
+        Some(t) => LspStatus::Indexing { detail: t.clone() },
+        None if !readiness.is_loaded() => LspStatus::Indexing { detail: "loading workspace".into() },
+        None => LspStatus::Ready,
+    };
 }

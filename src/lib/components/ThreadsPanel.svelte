@@ -1,7 +1,6 @@
 <script lang="ts">
   import { openAiTask, openComposer } from '../actions';
   import { app } from '../state.svelte';
-  import ActivityPanel from './ActivityPanel.svelte';
   import ChatPanel from './ChatPanel.svelte';
   import FindingsPanel from './FindingsPanel.svelte';
   import { submitReview } from '../review-actions';
@@ -49,7 +48,6 @@
     <FindingsPanel />
   {:else}
   <div class="threads-body">
-    <ActivityPanel />
     {#if app.composer}<NewThread />{/if}
     {#each split.here as t (t.id)}
       <ThreadCard thread={t} />

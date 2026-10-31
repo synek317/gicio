@@ -98,14 +98,15 @@
             <span class="spacer"></span>
             {#if job}<button class="small danger" onclick={(e) => { e.stopPropagation(); api.cancelJob(job.id); }}>Stop</button>{/if}
           </div>
-          {#if job?.status === 'running'}<JobLog {job} lines={5} />{/if}
+          {#if job?.status === 'running'}<JobLog {job} compact />{/if}
         </div>
       {/if}
     </div>
     {#if !thread.busy}
-      <textarea bind:value={reply} onkeydown={key} rows="2" placeholder="Reply…"></textarea>
-      <EditHint bind:checked={allowEdits} />
-      <div class="send-row"><SendButtons {send} small /></div>
+      <textarea class="reply" bind:value={reply} onkeydown={key} rows={reply ? 3 : 1} placeholder="Reply… (⌘↵ asks the AI)"></textarea>
+      {#if reply.trim()}
+        <div class="send-row"><EditHint bind:checked={allowEdits} /><span class="spacer"></span><SendButtons {send} small /></div>
+      {/if}
     {/if}
   {:else}
     <button class="link collapsed-summary" onclick={(e) => { e.stopPropagation(); collapsed = false; }} title="Expand">

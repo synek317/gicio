@@ -11,6 +11,8 @@ use std::time::Duration;
 use tokio::sync::Mutex;
 
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(20);
+/// How long workspace-wide requests wait for the project to load.
+const LOAD_TIMEOUT: Duration = Duration::from_secs(120);
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -59,6 +61,7 @@ impl RustAnalyzer {
                     "synchronization": {"didSave": false}
                 },
                 "general": {"positionEncodings": ["utf-16"]},
+                "experimental": {"serverStatusNotification": true},
                 "workspace": {"workspaceEdit": {"documentChanges": true, "resourceOperations": ["rename"]}}
             },
             "initializationOptions": {"checkOnSave": false, "cachePriming": {"enable": true}}
@@ -118,10 +121,12 @@ impl RustAnalyzer {
     }
 
     pub async fn references(&self, path: &FilePath, line: u32, character: u32) -> Result<Vec<SourceLocation>> {
+        // Before the workspace is loaded only the opened files would be searched.
+        self.client.wait_until_loaded(LOAD_TIMEOUT).await?;
         let uri = self.sync(path).await?;
         let mut params = Self::position(&uri, line, character);
         params["context"] = json!({"includeDeclaration": true});
-        let res = self.client.request("textDocument/references", params, REQUEST_TIMEOUT).await?;
+        let res = self.client.request_retrying("textDocument/references", params, REQUEST_TIMEOUT).await?;
         Ok(self.locations(res))
     }
 
@@ -147,10 +152,11 @@ impl RustAnalyzer {
 
     /// The file operations renaming the symbol at this position to `new_name` everywhere.
     pub async fn rename(&self, path: &FilePath, line: u32, character: u32, new_name: &super::NewName) -> Result<Vec<super::FileOp>> {
+        self.client.wait_until_loaded(LOAD_TIMEOUT).await?;
         let uri = self.sync(path).await?;
         let mut params = Self::position(&uri, line, character);
         params["newName"] = json!(new_name.as_str());
-        let res = self.client.request("textDocument/rename", params, Duration::from_secs(60)).await?;
+        let res = self.client.request_retrying("textDocument/rename", params, Duration::from_secs(60)).await?;
         Ok(super::workspace_edit::parse_workspace_edit(&res))
     }
 

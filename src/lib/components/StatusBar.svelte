@@ -1,5 +1,6 @@
 <script lang="ts">
   import { app } from '../state.svelte';
+  import ActivityPanel from './ActivityPanel.svelte';
   import AiSettings from './AiSettings.svelte';
   import ProgressBar from './ProgressBar.svelte';
 
@@ -7,7 +8,6 @@
   const b = $derived(app.snap?.backend);
 
   const p = $derived(app.overall);
-  const busy = $derived(app.snap?.threads.filter((t) => t.busy).length ?? 0);
   const lspText = $derived.by(() => {
     const l = app.lsp;
     if (l.state === 'indexing') return `rust-analyzer: ${l.detail || 'indexing'}`;
@@ -22,7 +22,7 @@
   <span>{p.accepted}/{p.total} lines accepted · {p.deferred} later · {p.pending} pending</span>
   <span class="spacer"></span>
   {#if app.snap?.planning}<span><span class="spinner"></span> planning</span>{/if}
-  {#if busy}<span><span class="spinner"></span> {busy} AI reply in progress</span>{/if}
+  <ActivityPanel />
   <span class="lsp {app.lsp.state}" title={lspText}>{lspText}</span>
   <button class="ghost small" onclick={() => (showAi = true)} title="Change AI, model and reasoning; see project instructions">
     AI: {b?.engine.kind}{b?.model ? ` · ${b.model}` : ''}{b?.effort ? ` · ${b.effort}` : ''} · {app.snap?.instructions.length ?? 0} instr. ▾

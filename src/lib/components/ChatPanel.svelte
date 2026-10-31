@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
   import { openUrl } from '@tauri-apps/plugin-opener';
   import { run } from '../actions';
   import { api } from '../api';
@@ -26,6 +27,8 @@
     }
   });
   let list: HTMLElement | undefined = $state();
+  // The summary is the first thing to read; once a conversation is going it folds away.
+  let summaryOpen = $state(untrack(() => !app.snap?.chat.length));
 
   const s = $derived(app.snap!);
   const chatJob = $derived(app.jobs.findLast((j) => j.kind === 'chat' && j.status === 'running'));
@@ -65,26 +68,26 @@
 
 <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
 <div class="chat" onclick={links}>
-  <section class="card summary-card">
-    <header class="row">
-      <h3>Summary of the change</h3>
-      <span class="spacer"></span>
-      {#if s.summaryBusy}
-        <span class="spinner"></span>
-        {#if sumJob}<button class="small danger" onclick={() => api.cancelJob(sumJob.id)}>Stop</button>{/if}
-      {:else}
-        <button class="small" class:primary={!s.summary} onclick={() => api.summarize().catch((e) => app.toast(String(e), 'error'))}>{s.summary ? 'Regenerate' : 'Generate summary'}</button>
-      {/if}
-    </header>
-    {#if s.summaryBusy && sumJob}<JobLog job={sumJob} lines={4} />{/if}
-    {#if s.summary}
-      <div class="md">{@html renderMarkdown(s.summary.body)}</div>
-    {:else if !s.summaryBusy}
-      <p class="muted small">What the change does, how, its risks and where to look closely, written by the AI from the whole diff.</p>
-    {/if}
-  </section>
-
   <div class="chat-list" bind:this={list}>
+    <details class="chat-summary" bind:open={summaryOpen}>
+      <summary class="row">
+        <span class="chat-summary-title">Summary of the change</span>
+        <span class="spacer"></span>
+        {#if s.summaryBusy}
+          <span class="spinner"></span>
+          {#if sumJob}<button class="ghost small" onclick={(e) => { e.preventDefault(); api.cancelJob(sumJob.id); }}>Stop</button>{/if}
+        {:else}
+          <button class="small" class:primary={!s.summary} onclick={(e) => { e.preventDefault(); summaryOpen = true; api.summarize().catch((err) => app.toast(String(err), 'error')); }}>{s.summary ? 'Regenerate' : 'Generate'}</button>
+        {/if}
+      </summary>
+      {#if s.summaryBusy && sumJob}<JobLog job={sumJob} compact />{/if}
+      {#if s.summary}
+        <div class="md">{@html renderMarkdown(s.summary.body)}</div>
+      {:else if !s.summaryBusy}
+        <p class="muted small">What the change does, how, its risks and where to look closely, written by the AI from the whole diff.</p>
+      {/if}
+    </details>
+
     {#each s.chat as m}
       <div class="msg {m.author.kind} {m.kind}"><div class="who">{who(m)}</div><div class="md">{@html renderMarkdown(m.body)}</div></div>
     {:else}
@@ -92,19 +95,19 @@
     {/each}
     {#if s.chatBusy}
       <div class="msg ai busy">
-        <div class="row"><span class="spinner"></span> thinking… <span class="spacer"></span>{#if chatJob}<button class="small danger" onclick={() => api.cancelJob(chatJob.id)}>Stop</button>{/if}</div>
-        {#if chatJob}<JobLog job={chatJob} lines={4} />{/if}
+        <div class="row"><span class="spinner"></span> thinking… <span class="spacer"></span>{#if chatJob}<button class="ghost small" onclick={() => api.cancelJob(chatJob.id)}>Stop</button>{/if}</div>
+        {#if chatJob}<JobLog job={chatJob} compact />{/if}
       </div>
     {/if}
   </div>
 
   <div class="chat-compose">
-    <textarea bind:value={body} onkeydown={key} rows="3" placeholder="Ask about the whole change…"></textarea>
+    <textarea bind:value={body} onkeydown={key} rows="2" placeholder="Ask about the whole change…"></textarea>
     <div class="row">
       <EditHint bind:checked={allowEdits} />
       <span class="spacer"></span>
       {#if s.chat.length}<button class="ghost small" onclick={() => run(api.clearChat())}>Clear</button>{/if}
-      <button class="primary" disabled={s.chatBusy} onclick={send}>Send <kbd>⌘↵</kbd></button>
+      <button class="primary small" disabled={s.chatBusy || !body.trim()} onclick={send}>Send <kbd>⌘↵</kbd></button>
     </div>
   </div>
 </div>

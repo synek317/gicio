@@ -1,5 +1,7 @@
 mod client;
+mod content_modified;
 mod new_name;
+mod readiness;
 mod rust_analyzer;
 mod transport;
 mod uri;

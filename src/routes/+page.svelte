@@ -3,6 +3,7 @@
   import { api, onJobs, onSession, onWorktreeChanged } from '$lib/api';
   import { handleKey } from '$lib/hotkeys';
   import { pollLspStatus } from '$lib/lsp';
+  import { handlePathLinks } from '$lib/path-links';
   import { app } from '$lib/state.svelte';
   import Overlays from '$lib/components/Overlays.svelte';
   import ReviewApp from '$lib/components/ReviewApp.svelte';
@@ -15,6 +16,7 @@
   onMount(() => {
     const off = onSession((s) => app.snap && app.applySnapshot(s));
     const stop = pollLspStatus();
+    const offPathLinks = handlePathLinks();
     const offJobs = onJobs((j) => (app.jobs = j), (id, line) => app.jobLog(id, line));
     api.listJobs().then((j) => (app.jobs = j)).catch(() => {});
     const offDisk = onWorktreeChanged((files) => {
@@ -25,6 +27,7 @@
       off();
       offJobs();
       offDisk();
+      offPathLinks();
       stop();
     };
   });
