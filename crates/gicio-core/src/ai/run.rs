@@ -103,7 +103,12 @@ pub async fn run_streaming(backend: &AiBackend, repo: &RepoRoot, prompt: &str, m
         }
         Output::Stdout => {
             if !status.success() {
-                bail!("{} failed ({status}): {}", backend.label(), tail(if stderr.trim().is_empty() { &stdout } else { &stderr }));
+                let out = if stderr.trim().is_empty() { &stdout } else { &stderr };
+                if out.contains("No authentication information found") {
+                    let path = super::resolve_program("copilot").map(|p| p.display().to_string()).unwrap_or_else(|| "copilot".into());
+                    bail!("GitHub Copilot CLI is not signed in. In a terminal, run `{path}` once and type /login (it remembers the login).");
+                }
+                bail!("{} failed ({status}): {}", backend.label(), tail(out));
             }
             Ok(stdout)
         }

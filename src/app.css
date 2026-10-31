@@ -336,3 +336,42 @@ label.choice.disabled { opacity: 0.5; }
 .qrow { position: relative; }
 .qrow .unaccept { position: absolute; right: 4px; top: 6px; z-index: 1; display: none; padding: 0 6px; }
 .qrow:hover .unaccept { display: block; }
+.start-card label.toggle.remember { flex-direction: row; font-weight: normal; color: var(--fg); }
+.split-button { display: inline-flex; }
+.split-button > button:first-child { border-radius: 6px 0 0 6px; }
+.split-button > button.caret { border-radius: 0 6px 6px 0; border-left: none; padding: 3px 6px; }
+.menu.dropdown { min-width: 300px; }
+.menu.dropdown .muted { font-size: 11px; }
+label.choice, .settings label.choice { display: flex; flex-direction: row; align-items: flex-start; gap: 8px; font-weight: normal; cursor: pointer; }
+label.choice input { width: auto; margin-top: 3px; }
+.settings fieldset { margin-bottom: 4px; }
+.send-row { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+.send-row button { white-space: nowrap; }
+.composer .anchor { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.thread-head { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.thread-head .anchor { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.thread-head .badge { flex: none; }
+.thread-actions { flex: none; display: flex; gap: 4px; }
+button.resolve { border-color: var(--ok); color: var(--ok); }
+.item-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 3px 10px; background: var(--bg2); font-size: 11px; border-bottom: 1px solid var(--border); }
+.item-chip { font: 11px var(--mono); color: var(--ok); border-color: color-mix(in srgb, var(--ok) 40%, transparent); }
+.item-chip:hover { background: color-mix(in srgb, var(--ok) 14%, transparent) !important; }
+.thread-head .chevron { flex: none; padding: 0 2px; width: 18px; }
+.collapsed-summary { color: var(--muted); font-size: 12px; text-align: left; white-space: normal; }
+.card.thread.resolved .collapsed-summary { text-decoration: none; }
+/* Accept-item button right after the text of an item's first line. */
+.item-chip.inline { display: inline-block; margin-left: 12px; padding: 0 7px; line-height: 16px; vertical-align: 1px; font: 10.5px var(--mono); color: var(--ok); background: var(--bg); border: 1px solid color-mix(in srgb, var(--ok) 45%, transparent); border-radius: 9px; opacity: 0.55; white-space: nowrap; }
+.line:hover .item-chip.inline, .item-chip.inline:hover { opacity: 1; }
+.item-chip.inline:hover { background: color-mix(in srgb, var(--ok) 18%, var(--bg)); }
+/* Lines an accept button would accept. */
+.line.preview { background-image: linear-gradient(color-mix(in srgb, var(--ok) 28%, transparent), color-mix(in srgb, var(--ok) 28%, transparent)); }
+.line.preview .gutter { box-shadow: inset 3px 0 0 var(--ok); }
+.blank-prompt { position: fixed; left: 50%; bottom: 40px; transform: translateX(-50%); z-index: 75; width: 560px; max-width: 92vw; background: var(--bg); border: 1px solid var(--ok); border-radius: 10px; padding: 10px 14px; box-shadow: 0 8px 28px rgba(0,0,0,.3); display: flex; flex-direction: column; gap: 8px; }
+.rename-dialog { width: 480px; display: flex; flex-direction: column; gap: 10px; }
+.rename-dialog h2 { margin: 0; }
+.rename-dialog input[type=text], .rename-dialog > input { font: 14px var(--mono); }
+.rename-dialog fieldset label.choice { flex-direction: row; }
+.badge.outdated { color: var(--muted); border-style: dashed; }
+.anchor.gone { text-decoration: line-through; color: var(--muted); }
+.tool-missing { grid-column: 1 / -1; margin-top: 6px; padding: 8px 10px; border: 1px solid var(--warn); border-radius: 6px; background: var(--warn-bg); font-size: 12px; line-height: 1.5; }
+.tool-missing code { user-select: all; }

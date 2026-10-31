@@ -32,11 +32,41 @@ pub fn login_path() -> &'static str {
     })
 }
 
-/// `GICIO_<NAME>_BIN` overrides; otherwise the first match on the extended PATH.
+/// CLIs that desktop apps ship inside their bundle (the ChatGPT app carries Codex, signed in
+/// with the same account).
+const BUNDLED: &[(&str, &str)] = &[
+    ("codex", "/Applications/ChatGPT.app/Contents/Resources/codex-cli/bin/codex"),
+    ("codex", "~/Applications/ChatGPT.app/Contents/Resources/codex-cli/bin/codex"),
+];
+
+/// Newest `<dir>/<version>/<name>` (the GitHub Copilot app downloads its CLI into a version cache).
+fn newest_versioned(dir: &str, name: &str) -> Option<PathBuf> {
+    let home = std::env::var("HOME").unwrap_or_default();
+    let mut found: Vec<(Vec<u64>, PathBuf)> = std::fs::read_dir(dir.replacen('~', &home, 1))
+        .ok()?
+        .flatten()
+        .map(|e| e.path().join(name))
+        .filter(|p| p.is_file())
+        .map(|p| {
+            let version = p.parent().and_then(|d| d.file_name()).map(|v| v.to_string_lossy().split(['.', '-']).filter_map(|n| n.parse().ok()).collect()).unwrap_or_default();
+            (version, p)
+        })
+        .collect();
+    found.sort();
+    found.pop().map(|(_, p)| p)
+}
+
+/// `GICIO_<NAME>_BIN` overrides; then the extended PATH; then CLIs bundled in desktop apps.
 pub fn resolve_program(name: &str) -> Option<PathBuf> {
     let var = format!("GICIO_{}_BIN", name.to_uppercase().replace('-', "_"));
     if let Ok(p) = std::env::var(var) {
         return Some(PathBuf::from(p));
     }
-    login_path().split(':').map(|d| PathBuf::from(d).join(name)).find(|p| p.is_file())
+    let home = std::env::var("HOME").unwrap_or_default();
+    login_path()
+        .split(':')
+        .map(|d| PathBuf::from(d).join(name))
+        .chain(BUNDLED.iter().filter(|(n, _)| *n == name).map(|(_, p)| PathBuf::from(p.replacen('~', &home, 1))))
+        .find(|p| p.is_file())
+        .or_else(|| if name == "copilot" { newest_versioned("~/Library/Caches/github-copilot-sdk/cli", "copilot") } else { None })
 }

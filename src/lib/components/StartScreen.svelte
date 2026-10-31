@@ -1,47 +1,51 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { open } from '@tauri-apps/plugin-dialog';
-  import { go, plan } from '../actions';
   import { api, inTauri } from '../api';
-  import { loadSettings, saveSettings } from '../settings';
-  import { app } from '../state.svelte';
-  import { toBackend, type BackendForm } from '../backend-form';
-  import BackendPicker from './BackendPicker.svelte';
   import { settings } from '../app-settings.svelte';
+  import type { BackendForm } from '../backend-form';
+  import { openReview } from '../open-review';
+  import { loadRecent, saveRecent } from '../settings';
+  import type { StartOptions } from '../start-options';
+  import BackendPicker from './BackendPicker.svelte';
+  import ReviewOptions from './ReviewOptions.svelte';
 
-  const s = $state(loadSettings());
+  const recent = $state(loadRecent());
+  let options = $state<StartOptions>({ ...settings.value.start });
   let form = $state<BackendForm>({ ...settings.value.defaultBackend });
-  s.order = settings.value.prefs.order;
-  let refs = $state<string[]>([]);
+  let remember = $state(false);
   let opening = $state(false);
   let error = $state('');
 
-  $effect(() => {
-    const r = s.repo;
-    if (!r) return;
-    api.listRefs(r).then((x) => (refs = x)).catch(() => (refs = []));
+  // `gicio [PATH] [--since REF] [--start]`: the command line wins over the defaults. With remembered
+  // defaults (or --start) the review opens right away.
+  onMount(async () => {
+    const args = await api.launchArgs().catch(() => null);
+    if (!args) return;
+    if (args.repo) recent.repo = args.repo;
+    if (args.since) {
+      options.scope = 'since';
+      options.base = args.since;
+    }
+    if (args.warning) error = args.warning;
+    if (args.repo && (args.start || settings.value.skipStartScreen)) start();
   });
 
   async function browse() {
     const dir = await open({ directory: true, multiple: false });
-    if (typeof dir === 'string') s.repo = dir;
+    if (typeof dir === 'string') recent.repo = dir;
   }
 
   async function start() {
     error = '';
     opening = true;
-    Object.assign(s, form);
-    const backend = toBackend(form);
     try {
-      s.recent = [s.repo, ...s.recent.filter((r) => r !== s.repo)].slice(0, 8);
-      saveSettings($state.snapshot(s));
-      const stageMode = s.scope === 'uncommitted' ? s.stage : 'memory';
-      const snap = await api.openSession(s.repo, s.scope === 'uncommitted' ? 'HEAD' : s.base, backend, stageMode);
-      app.layout = settings.value.prefs.layout;
-      app.applySnapshot(snap);
-      app.history = [];
-      app.future = [];
-      if (snap.chunks[0]) go({ kind: 'chunk', id: snap.chunks[0].id }, false);
-      if (s.order === 'ai' && !snap.plannedByAi && snap.files.length) plan(false);
+      recent.recent = [recent.repo, ...recent.recent.filter((r) => r !== recent.repo)].slice(0, 8);
+      saveRecent($state.snapshot(recent));
+      if (remember) {
+        await settings.save({ ...settings.value, start: $state.snapshot(options), defaultBackend: $state.snapshot(form), skipStartScreen: true });
+      }
+      await openReview(recent.repo, options, form);
     } catch (e) {
       error = String(e);
     } finally {
@@ -57,57 +61,24 @@
 
     <label>Repository
       <div class="row">
-        <input bind:value={s.repo} placeholder="/path/to/repo" spellcheck="false" />
+        <input bind:value={recent.repo} placeholder="/path/to/repo" spellcheck="false" />
         {#if inTauri}<button onclick={browse}>Browse…</button>{/if}
       </div>
     </label>
-    {#if s.recent.length}
-      <div class="chips">{#each s.recent as r}<button class="chip" onclick={() => (s.repo = r)} title={r}>{r.split('/').pop()}</button>{/each}</div>
+    {#if recent.recent.length}
+      <div class="chips">{#each recent.recent as r}<button class="chip" onclick={() => (recent.repo = r)} title={r}>{r.split('/').pop()}</button>{/each}</div>
     {/if}
 
-    <fieldset>
-      <legend>What to review</legend>
-      <label class="choice"><input type="radio" bind:group={s.scope} value="uncommitted" />
-        <span><strong>Uncommitted changes</strong><br /><span class="muted small">Staged, unstaged and new files, compared to HEAD.</span></span>
-      </label>
-      <label class="choice"><input type="radio" bind:group={s.scope} value="since" />
-        <span><strong>Everything since a branch or commit</strong><br /><span class="muted small">Commits on top of it plus uncommitted changes, e.g. an AI's branch against <code>main</code>.</span></span>
-      </label>
-      {#if s.scope === 'since'}
-        <div class="indent">
-          <input bind:value={s.base} list="refs" spellcheck="false" placeholder="main" />
-          <datalist id="refs">{#each refs as r}<option value={r}></option>{/each}</datalist>
-          <div class="chips">{#each ['main', 'master', 'origin/main', 'HEAD~1'] as r}<button class="chip" onclick={() => (s.base = r)}>{r}</button>{/each}</div>
-        </div>
-      {/if}
-    </fieldset>
-
-    <fieldset>
-      <legend>Accepted changes</legend>
-      <label class="choice"><input type="radio" bind:group={s.stage} value="memory" />
-        <span><strong>Remember them in gicio only</strong><br /><span class="muted small">Your git index is not touched.</span></span>
-      </label>
-      <label class="choice" class:disabled={s.scope !== 'uncommitted'}><input type="radio" bind:group={s.stage} value="index" disabled={s.scope !== 'uncommitted'} />
-        <span><strong>Stage them in git</strong><br /><span class="muted small">
-          {#if s.scope !== 'uncommitted'}Only for uncommitted changes.{:else}Accepted lines are staged (also parts of files), everything else is not, so you can commit exactly what you reviewed.
-          <span class="warn-text">Everything currently staged is unstaged first.</span>{/if}
-        </span></span>
-      </label>
-    </fieldset>
-
-    <fieldset>
-      <legend>Order of review</legend>
-      <label class="choice"><input type="radio" bind:group={s.order} value="ai" />
-        <span><strong>Logical steps planned by AI</strong><br /><span class="muted small">Groups related changes (also parts of files) and orders them so each step builds on the previous one. Takes a minute; you can start file by file meanwhile.</span></span>
-      </label>
-      <label class="choice"><input type="radio" bind:group={s.order} value="files" />
-        <span><strong>File by file</strong><br /><span class="muted small">No planning. You can still ask the AI to plan later from the top bar.</span></span>
-      </label>
-    </fieldset>
-
+    <ReviewOptions bind:options repo={recent.repo || null} idPrefix="start" />
     <BackendPicker bind:form />
 
+    <label class="toggle remember">
+      <input type="checkbox" bind:checked={remember} />
+      Remember these choices and skip this screen next time
+      <span class="info" title="`gicio` and `gicio PATH` will open the review right away. Change everything later from the “Start over ▾” menu or in Settings → Preferences.">ⓘ</span>
+    </label>
+
     {#if error}<div class="error">{error}</div>{/if}
-    <button class="primary big" disabled={!s.repo || (s.scope === 'since' && !s.base) || opening} onclick={start}>{opening ? 'Opening…' : 'Start review'}</button>
+    <button class="primary big" disabled={!recent.repo || (options.scope === 'since' && !options.base) || opening} onclick={start}>{opening ? 'Opening…' : 'Start review'}</button>
   </div>
 </div>

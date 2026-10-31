@@ -1,4 +1,4 @@
-import { hoverTooltip, EditorView } from '@codemirror/view';
+import { hoverTooltip, EditorView, keymap } from '@codemirror/view';
 import type { Extension } from '@codemirror/state';
 import { api } from './api';
 import { gotoDefinition, lspUsable } from './lsp';
@@ -30,6 +30,17 @@ export function lspExtensions(path: string): Extension[] {
         },
       };
     }, { hoverTime: settings.value.prefs.hoverDelayMs }),
+    keymap.of([
+      {
+        key: 'F2',
+        run: (view) => {
+          if (!lspUsable(path)) return false;
+          const { line, col } = pos(view, view.state.selection.main.head);
+          app.rename = { path, line, character: col };
+          return true;
+        },
+      },
+    ]),
     EditorView.domEventHandlers({
       mousedown(e, view) {
         if (!(e.metaKey || e.ctrlKey)) return false;

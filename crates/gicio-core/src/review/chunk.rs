@@ -83,6 +83,11 @@ pub struct Note {
     pub side: Side,
     pub line: u32,
     pub text: String,
+    /// The line's code when the note was made, to follow it.
+    #[serde(default)]
+    pub code: String,
+    #[serde(default)]
+    pub outdated: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

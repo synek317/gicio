@@ -9,7 +9,22 @@
   import JobLog from './JobLog.svelte';
 
   let body = $state('');
-  let allowEdits = $state(false);
+  // Change requests are common in the chat; the choice is remembered on this machine.
+  const EDITS_KEY = 'gicio.chat.allowEdits';
+  let allowEdits = $state((() => {
+    try {
+      return localStorage.getItem(EDITS_KEY) !== 'false';
+    } catch {
+      return true;
+    }
+  })());
+  $effect(() => {
+    try {
+      localStorage.setItem(EDITS_KEY, String(allowEdits));
+    } catch {
+      /* private mode */
+    }
+  });
   let list: HTMLElement | undefined = $state();
 
   const s = $derived(app.snap!);

@@ -1,34 +1,23 @@
-import type { BackendKind, Effort } from './types';
-
-/** Start-screen choices, remembered between runs. */
-export interface Settings {
+/** The last repositories opened from the start screen (per machine, in local storage). */
+export interface RecentRepos {
   repo: string;
-  scope: 'uncommitted' | 'since';
-  stage: 'memory' | 'index';
-  base: string;
-  kind: BackendKind;
-  model: string;
-  effort: Effort | '';
-  command: string;
-  language: string;
-  order: 'ai' | 'files';
   recent: string[];
 }
 
 const KEY = 'gicio.start';
-const DEFAULTS: Settings = { repo: '', scope: 'uncommitted', stage: 'memory', base: 'main', kind: 'claude', model: '', effort: '', command: '', language: 'English', order: 'ai', recent: [] };
 
-export function loadSettings(): Settings {
+export function loadRecent(): RecentRepos {
   try {
-    return { ...DEFAULTS, ...JSON.parse(localStorage.getItem(KEY) ?? '{}') };
+    const raw = JSON.parse(localStorage.getItem(KEY) ?? '{}');
+    return { repo: raw.repo ?? '', recent: raw.recent ?? [] };
   } catch {
-    return { ...DEFAULTS };
+    return { repo: '', recent: [] };
   }
 }
 
-export function saveSettings(s: Settings) {
+export function saveRecent(r: RecentRepos) {
   try {
-    localStorage.setItem(KEY, JSON.stringify(s));
+    localStorage.setItem(KEY, JSON.stringify(r));
   } catch {
     /* private mode */
   }

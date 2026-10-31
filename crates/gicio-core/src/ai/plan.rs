@@ -72,7 +72,7 @@ pub async fn plan(req: PlanRequest, log: LogSink, cancel: Option<oneshot::Receiv
             LineKind::Removed => (Side::Old, line.old_no?),
             _ => (Side::New, line.new_no?),
         };
-        Some(Note { path: h.path.clone(), side, line: no, text: n.text.clone() })
+        Some(Note { path: h.path.clone(), side, line: no, text: n.text.clone(), code: line.text.clone(), outdated: false })
     };
     let chunks: Vec<PlannedChunk> = raw
         .chunks

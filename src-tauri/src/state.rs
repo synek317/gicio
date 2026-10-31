@@ -8,6 +8,8 @@ pub struct AppState {
     pub lsp: Mutex<LspSlot>,
     pub jobs: crate::jobs::Jobs,
     pub settings: crate::settings::SettingsStore,
+    /// Bumped per opened review, so only the newest working-tree watcher keeps running.
+    pub watch_generation: std::sync::atomic::AtomicU64,
 }
 
 #[derive(Default)]

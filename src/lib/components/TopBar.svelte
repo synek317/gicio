@@ -1,9 +1,10 @@
 <script lang="ts">
-  import { back, forward, plan, run, startOver } from '../actions';
+  import { back, forward, plan, run } from '../actions';
   import { api } from '../api';
   import { app } from '../state.svelte';
   import { settings } from '../app-settings.svelte';
   import CommitDialog from './CommitDialog.svelte';
+  import StartOverMenu from './StartOverMenu.svelte';
   import ToolsMenu from './ToolsMenu.svelte';
 
   const s = $derived(app.snap!);
@@ -37,10 +38,10 @@
   {/if}
   <button disabled={!s.canUndo} onclick={() => run(api.undo())} title="Undo last accept/later (z)">Undo</button>
   <button onclick={() => run(api.refresh())} title="Reload the diff from disk (r)">Reload</button>
-  <button onclick={startOver} title="Discard all review progress and start again">Start over</button>
+  <StartOverMenu />
   <button class="ghost" onclick={() => (settings.open = true)} title="Settings">⚙</button>
   <button class="ghost" onclick={() => (app.showHelp = true)}>?</button>
-  <button class="ghost" onclick={() => { app.snap = null; app.view = null; }} title="Back to start screen">✕</button>
+  <button class="ghost" onclick={() => { app.snap = null; app.view = null; }} title="Close this review (open another repository)">✕</button>
 </header>
 
 {#if showCommit}<CommitDialog close={() => (showCommit = false)} />{/if}

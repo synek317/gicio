@@ -19,6 +19,9 @@ pub struct Anchor {
     pub end: u32,
     /// The anchored lines' text when the thread was created.
     pub excerpt: String,
+    /// That code is gone (changed or removed).
+    #[serde(default)]
+    pub outdated: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

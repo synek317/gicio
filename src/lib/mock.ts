@@ -35,6 +35,11 @@ export async function mockInvoke(cmd: string, args: Record<string, any> = {}): P
     case 'get_session':
     case 'refresh':
       return bump();
+    case 'launch_args': {
+      // Simulates `gicio PATH [--since REF] [--start]` with `?repo=…&since=…&start`.
+      const q = new URLSearchParams(location.search);
+      return q.get('repo') ? { repo: q.get('repo'), since: q.get('since'), start: q.has('start'), warning: null } : null;
+    }
     case 'list_refs':
       return ['main', 'HEAD~1'];
     case 'file_texts':
@@ -106,11 +111,21 @@ export async function mockInvoke(cmd: string, args: Record<string, any> = {}): P
       return 'Add mock commit message\n\nBody.';
     case 'commit':
       return ['abc1234', bump()];
+    case 'set_stage_mode':
+      s.stageMode = args.mode;
+      return bump();
+    case 'set_last_chunk':
+      return null;
+    case 'plan_by_files':
+      s.plannedByAi = false;
+      return bump();
     case 'set_diff_options':
       s.diffOptions = args.options;
       return bump();
     case 'lsp_symbols':
       return [];
+    case 'ai_tools':
+      return { claude: true, codex: false, copilot: false };
     case 'set_backend':
       s.backend = args.backend;
       return bump();

@@ -7,6 +7,7 @@
   import { texts } from '../texts.svelte';
   import type { Hunk } from '../types';
   import HunkView from './HunkView.svelte';
+  import { previewOff, previewOn } from '../preview';
 
   let { path, hunks }: { path: string; hunks: Hunk[] } = $props();
 
@@ -23,28 +24,6 @@
 
   $effect(() => {
     if (file) texts.ensure(file);
-  });
-
-  // Track whether this block is on screen, so the file tree can highlight it.
-  $effect(() => {
-    if (!block) return;
-    const p = path;
-    let visible = false;
-    const set = (on: boolean) => {
-      if (on === visible) return;
-      visible = on;
-      const n = (app.onScreen[p] ?? 0) + (on ? 1 : -1);
-      const next = { ...app.onScreen };
-      if (n > 0) next[p] = n;
-      else delete next[p];
-      app.onScreen = next;
-    };
-    const io = new IntersectionObserver(([e]) => set(e.isIntersecting), { root: document.getElementById('diff-scroll') });
-    io.observe(block);
-    return () => {
-      io.disconnect();
-      set(false);
-    };
   });
 
   async function accept() {
@@ -71,7 +50,7 @@
     {/if}
     {#if unaccepted.length}
       <button onclick={() => markKeys(unaccepted, 'deferred')} title="Put these changes off for later">Later</button>
-      <button class="primary-soft" onclick={accept} title={whole ? 'Accept all changes in this file' : 'Accept the changes of this file shown in this step; the rest of the file is in other steps'}>
+      <button class="primary-soft" onmouseenter={() => previewOn(unaccepted)} onmouseleave={previewOff} onclick={accept} title={whole ? 'Accept all changes in this file' : 'Accept the changes of this file shown in this step; the rest of the file is in other steps'}>
         ✓ {whole ? 'Accept file' : `Accept this part (${prog.total} lines)`}
       </button>
     {/if}

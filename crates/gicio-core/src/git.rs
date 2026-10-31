@@ -135,3 +135,30 @@ pub fn commit(root: &RepoRoot, message: &str) -> Result<String> {
     git_with_input(root.path(), &["commit", "-q", "-F", "-"], message.as_bytes())?;
     git_str(root.path(), &["rev-parse", "--short", "HEAD"])
 }
+
+/// Cheap fingerprint of the changed part of the working tree (names, sizes, modification times of
+/// files differing from `base`, plus untracked files). Staging does not affect it.
+pub fn worktree_fingerprint(root: &RepoRoot, base: &CommitId) -> Result<u64> {
+    let mut names = git(root.path(), &["diff", "--name-only", "-z", base.as_str()])?;
+    names.extend(git(root.path(), &["ls-files", "--others", "--exclude-standard", "-z"])?);
+    let mut h: u64 = 0xcbf29ce484222325;
+    let mut mix = |bytes: &[u8]| {
+        for b in bytes {
+            h ^= *b as u64;
+            h = h.wrapping_mul(0x100000001b3);
+        }
+    };
+    for name in names.split(|b| *b == 0).filter(|n| !n.is_empty()) {
+        mix(name);
+        let meta = std::fs::metadata(root.path().join(String::from_utf8_lossy(name).as_ref()));
+        match meta {
+            Ok(m) => {
+                mix(&m.len().to_le_bytes());
+                let t = m.modified().ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map(|d| d.as_nanos()).unwrap_or(0);
+                mix(&t.to_le_bytes());
+            }
+            Err(_) => mix(b"-"),
+        }
+    }
+    Ok(h)
+}

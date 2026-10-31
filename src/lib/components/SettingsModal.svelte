@@ -1,6 +1,7 @@
 <script lang="ts">
   import { DEFAULT_SKIP, settings, type AppSettings } from '../app-settings.svelte';
   import BackendPicker from './BackendPicker.svelte';
+  import ReviewOptions from './ReviewOptions.svelte';
   import ShortcutEditor from './ShortcutEditor.svelte';
 
   let draft = $state<AppSettings>($state.snapshot(settings.value) as AppSettings);
@@ -48,14 +49,30 @@
         <p class="muted small">Added to every prompt (planning, answers, to-dos, chat, summaries), on top of the project's CLAUDE.md / AGENTS.md etc.</p>
         <textarea rows="7" bind:value={draft.aiInstructions} placeholder="e.g. Prefer newtypes over raw strings. Point out missing tests. Never suggest unwrap() in library code."></textarea>
       {:else if tab === 'prefs'}
+        <h3>Opening a repository</h3>
+        <label class="toggle"><input type="checkbox" bind:checked={draft.skipStartScreen} /> Skip the start screen: <code>gicio</code> and <code>gicio PATH</code> open the review right away with these defaults</label>
+        <ReviewOptions bind:options={draft.start} idPrefix="settings" />
+        <p class="muted small">The AI used by default is set in the AI tab. During a review, “Start over ▾” changes all of this for the current review.</p>
+        <h3>Reviewing</h3>
         <div class="prefs">
           <label>Default diff layout
             <select bind:value={draft.prefs.layout}><option value="split">Side by side</option><option value="unified">Unified</option></select>
           </label>
-          <label>Default order of review
-            <select bind:value={draft.prefs.order}><option value="ai">Logical steps planned by AI</option><option value="files">File by file</option></select>
-          </label>
           <label class="toggle"><input type="checkbox" bind:checked={draft.prefs.autoAdvance} /> After “Accept rest”, go to the next step automatically</label>
+          <label>When only blank or bracket-only lines (<code>{'}'}</code>, <code>{'{'}</code>, <code>{'});'}</code>) are left unaccepted in a file
+            <select bind:value={draft.prefs.blankLines}>
+              <option value="ask">Ask whether to accept the whole file</option>
+              <option value="accept">Accept them automatically</option>
+              <option value="never">Do nothing</option>
+            </select>
+          </label>
+          <label>After a rename, lines you had already accepted
+            <select bind:value={draft.prefs.renameAccepted}>
+              <option value="ask">Ask each time</option>
+              <option value="keep">Stay accepted</option>
+              <option value="review">Need another look</option>
+            </select>
+          </label>
           <label class="toggle"><input type="checkbox" bind:checked={draft.prefs.notesExpanded} /> Show AI notes (?) expanded</label>
           <label class="toggle"><input type="checkbox" bind:checked={draft.prefs.confirmStartOver} /> Ask before “Start over”</label>
           <label>rust-analyzer hover delay (ms)

@@ -23,3 +23,9 @@ pub fn set_backend(app: AppHandle, state: State<'_, AppState>, backend: AiBacken
     s.touch();
     Ok(publish(&app, &s))
 }
+
+/// Which AI command-line tools can be found (the app's PATH plus the usual install locations).
+#[tauri::command]
+pub fn ai_tools() -> std::collections::HashMap<&'static str, bool> {
+    ["claude", "codex", "copilot"].into_iter().map(|t| (t, gicio_core::ai::resolve_program(t).is_some())).collect()
+}

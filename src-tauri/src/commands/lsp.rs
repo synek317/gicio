@@ -55,3 +55,51 @@ pub async fn lsp_symbols(state: State<'_, AppState>, path: FilePath) -> Result<V
     let ra = state.lsp().ok_or("rust-analyzer is not running")?;
     ra.symbols(&path).await.map_err(err)
 }
+
+#[tauri::command]
+pub async fn lsp_prepare_rename(state: State<'_, AppState>, path: FilePath, line: u32, character: u32) -> Result<Option<String>, String> {
+    let ra = state.lsp().ok_or("rust-analyzer is not running")?;
+    ra.prepare_rename(&path, line, character).await.map_err(err)
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RenameResult {
+    files: usize,
+    edits: usize,
+}
+
+/// Renames the symbol everywhere (rust-analyzer), writes the files and re-reads the diff.
+#[tauri::command]
+pub async fn lsp_rename(app: tauri::AppHandle, state: State<'_, AppState>, path: FilePath, line: u32, character: u32, new_name: String, keep_accepted: bool, after: Option<gicio_core::domain::ChunkId>) -> Result<RenameResult, String> {
+    let ra = state.lsp().ok_or("rust-analyzer is not running")?;
+    let name = gicio_core::lsp::NewName::new(&new_name).map_err(err)?;
+    let ops = ra.rename(&path, line, character, &name).await.map_err(err)?;
+    if ops.is_empty() {
+        return Err("nothing to rename here".into());
+    }
+    let (paths, moved, edits) = {
+        let s = state.session()?;
+        let rel = |p: &std::path::Path| s.state.repo.relative(p).ok_or_else(|| format!("the rename would change {} outside the repository", p.display()));
+        let mut paths = Vec::new();
+        let mut moved = Vec::new();
+        for op in &ops {
+            for p in op.paths() {
+                paths.push(rel(p)?);
+            }
+            if let gicio_core::lsp::FileOp::Rename { from, to } = op {
+                moved.push((rel(from)?, rel(to)?));
+            }
+        }
+        paths.sort();
+        paths.dedup();
+        (paths, moved, ops.iter().map(|o| o.edit_count()).sum())
+    };
+    {
+        let mut s = state.session()?;
+        s.record_rename(&paths, &moved, keep_accepted, after, || gicio_core::lsp::apply_file_ops(&ops)).map_err(err)?;
+        crate::publish::publish(&app, &s);
+    }
+    ra.files_changed(&paths).await;
+    Ok(RenameResult { files: paths.len(), edits })
+}

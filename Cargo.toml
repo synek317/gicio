@@ -1,6 +1,8 @@
 [workspace]
 resolver = "3"
 members = ["src-tauri", "crates/gicio-core"]
+# `cargo run` in the repository root starts the app.
+default-members = ["src-tauri", "crates/gicio-core"]
 
 [workspace.dependencies]
 anyhow = "1"

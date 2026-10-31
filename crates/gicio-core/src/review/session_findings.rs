@@ -28,6 +28,8 @@ impl Session {
                 continue;
             }
             let side = if r.side.as_deref() == Some("old") { Side::Old } else { Side::New };
+            let (line, end_line) = (r.line.max(1), r.end_line.unwrap_or(r.line).max(r.line.max(1)));
+            let code = self.excerpt_of(&path, side, line, end_line);
             let id = self.state.next_finding_id();
             self.state.findings.push(Finding {
                 id,
@@ -35,11 +37,13 @@ impl Session {
                 severity: severity(r.severity.as_deref()),
                 path,
                 side,
-                line: r.line.max(1),
-                end_line: r.end_line.unwrap_or(r.line).max(r.line.max(1)),
+                line,
+                end_line,
                 title: r.title,
                 detail: r.detail,
                 status: crate::review::FindingStatus::Open,
+                code,
+                outdated: false,
             });
             n += 1;
         }
@@ -53,6 +57,7 @@ impl Session {
         let mut n = 0;
         let diags: Vec<ClippyDiagnostic> = diags.into_iter().filter(|d| self.changed(&d.path)).collect();
         for d in diags {
+            let code = self.excerpt_of(&d.path, Side::New, d.line, d.end_line);
             let id = self.state.next_finding_id();
             self.state.findings.push(Finding {
                 id,
@@ -65,6 +70,8 @@ impl Session {
                 title: d.title,
                 detail: d.detail,
                 status: FindingStatus::Open,
+                code,
+                outdated: false,
             });
             n += 1;
         }

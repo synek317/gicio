@@ -4,6 +4,8 @@ import { changedKeys, parseKey } from './keys';
 import { hunkProgress } from './progress';
 import { go } from './nav';
 import { scrollToLine } from './scroll';
+import { afterAccept } from './blank-lines';
+import { previewOff } from './preview';
 export { scrollToLine } from './scroll';
 import { app } from './state.svelte';
 import type { AnchorInput, MarkStatus, SendMode, Snapshot } from './types';
@@ -31,7 +33,9 @@ export async function markKeys(keys: string[], status: MarkStatus | null, advanc
   if (await run(api.setMarks(keys.map(parseKey), status))) {
     if (advance) app.selection = [];
     if (status && advance) focusNextPending();
+    if (status === 'accepted') afterAccept(new Set(keys.map((k) => parseKey(k).path)), (rest) => markKeys(rest, 'accepted', false));
   }
+  previewOff();
 }
 
 export const markTarget = (status: MarkStatus | null) => markKeys(targetKeys(), status);
@@ -124,7 +128,14 @@ function currentAnchor(): AnchorInput | null {
 
 export function openComposer(anchored = true) {
   const v = app.view;
+  app.rightTab = 'discussions';
   app.composer = { anchor: anchored ? currentAnchor() : null, chunk: v?.kind === 'chunk' ? v.id : null };
+}
+
+/** A review-wide task for the AI, not tied to lines or a step. */
+export function openAiTask() {
+  app.rightTab = 'discussions';
+  app.composer = { anchor: null, chunk: null, task: true };
 }
 
 export async function startThread(body: string, mode: SendMode, allowEdits: boolean) {
@@ -155,7 +166,7 @@ export function revealThread(t: { id: string; chunk: string | null; anchor: Anch
   app.activeThread = t.id;
   const a = t.anchor;
   if (t.chunk && app.chunk(t.chunk) && !(app.view?.kind === 'chunk' && app.view.id === t.chunk)) go({ kind: 'chunk', id: t.chunk });
-  if (a) setTimeout(() => scrollToLine(a.path, a.side, a.start), 60);
+  if (a && !(a as { outdated?: boolean }).outdated) setTimeout(() => scrollToLine(a.path, a.side, a.start), 60);
 }
 
 /** Throws away all progress for this review and starts again. */
@@ -168,7 +179,7 @@ export async function startOver() {
   app.future = [];
   const first = app.snap?.chunks[0];
   if (first) go({ kind: 'chunk', id: first.id }, false);
-  if (settings.value.prefs.order === 'ai') plan(false);
+  if (settings.value.start.order === 'ai') plan(false);
 }
 
 export function currentChunkId(): string | null {

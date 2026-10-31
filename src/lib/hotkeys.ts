@@ -1,5 +1,5 @@
 import { api } from './api';
-import { acceptRestAndNext, back, editFocused, forward, go, markTarget, moveChunk, moveFocus, nextPendingChunk, openComposer, run } from './actions';
+import { acceptRestAndNext, back, editFocused, forward, go, markTarget, moveChunk, moveFocus, nextPendingChunk, openAiTask, openComposer, run } from './actions';
 import { settings } from './app-settings.svelte';
 import { jumpFile, toggleCurrentFile } from './files-nav';
 import { comboOf, type ActionId } from './keymap';
@@ -19,6 +19,11 @@ const handlers: Record<ActionId, () => void> = {
   reset: () => markTarget(null),
   acceptRest: () => acceptRestAndNext(),
   comment: () => openComposer(),
+  aiTask: () => openAiTask(),
+  rename: () => {
+    if (app.pointerCode) app.rename = { ...app.pointerCode };
+    else app.toast('Point at a symbol (rust-analyzer running) and press F2, or right-click it.');
+  },
   openFile: () => editFocused(),
   toggleLayout: () => (app.layout = app.layout === 'split' ? 'unified' : 'split'),
   laterView: () => go({ kind: 'later' }),

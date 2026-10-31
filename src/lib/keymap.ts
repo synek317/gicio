@@ -13,6 +13,8 @@ export const ACTIONS = [
   { id: 'reset', label: 'Reset to pending', keys: ['u', 'backspace'] },
   { id: 'acceptRest', label: 'Accept everything left, go to next step', keys: ['shift+a', 'mod+enter'] },
   { id: 'comment', label: 'Comment / ask AI', keys: ['c', '/'] },
+  { id: 'aiTask', label: 'Give the AI a task (whole review)', keys: ['g', 'mod+shift+g'] },
+  { id: 'rename', label: 'Rename the symbol under the pointer', keys: ['f2', 'shift+f6'] },
   { id: 'openFile', label: 'Open file of focused hunk', keys: ['e', 'o'] },
   { id: 'toggleLayout', label: 'Toggle split / unified', keys: ['s', 'shift+s'] },
   { id: 'laterView', label: 'Show "later" items', keys: ['l', 'shift+d'] },

@@ -1,5 +1,9 @@
 <script lang="ts">
-  import { editFile, openComposer, selectLine } from '../actions';
+  import { editFile, markKeys, openComposer, selectLine } from '../actions';
+  import { itemsAround } from '../item-keys';
+  import { itemLabel } from '../items';
+  import { previewOff, previewOn } from '../preview';
+  import { texts } from '../texts.svelte';
   import { keyOf } from '../keys';
   import { findReferences, gotoDefinition, lspUsable } from '../lsp';
   import { app } from '../state.svelte';
@@ -8,10 +12,23 @@
   const m = $derived(app.menu!);
   const lsp = $derived(m.side === 'new' && lspUsable(m.path));
   const inDiff = $derived(app.orderedKeys.includes(keyOf(m.path, m.side, m.line)));
+  /** Whole items around the clicked line that still have unaccepted changes. */
+  const items = $derived.by(() => {
+    const t = texts.entries[m.path]?.texts;
+    const file = app.files.get(m.path);
+    if (!t || t.binary || !file) return [];
+    const found = m.side === 'new' ? itemsAround(file, t, [m.line], []) : itemsAround(file, t, [], [m.line]);
+    return found.map((it) => ({ ...it, open: it.keys.filter((k) => app.marks.get(k) !== 'accepted') })).filter((it) => it.open.length).slice(0, 5);
+  });
 
+  /** Runs an action, then closes the menu. The action reads the clicked position (`m`) first:
+   *  closing earlier would clear it. */
   function act(f: () => void) {
-    app.menu = null;
-    f();
+    try {
+      f();
+    } finally {
+      app.menu = null;
+    }
   }
 
   function ask() {
@@ -25,6 +42,13 @@
   <div class="menu" style="left:{Math.min(m.x, window.innerWidth - 230)}px; top:{Math.min(m.y, window.innerHeight - 180)}px" onclick={(e) => e.stopPropagation()}>
     <button disabled={!lsp} onclick={() => act(() => gotoDefinition(m.path, m.line, m.character))}>Go to definition <kbd>⌘-click</kbd></button>
     <button disabled={!lsp} onclick={() => act(() => findReferences(m.path, m.line, m.character))}>Find references</button>
+    <button disabled={!lsp} onclick={() => act(() => (app.rename = { path: m.path, line: m.line, character: m.character }))}>Rename symbol… <kbd>F2</kbd></button>
+    {#if items.length}
+      <hr />
+      {#each items as it}
+        <button onmouseenter={() => previewOn(it.open)} onmouseleave={previewOff} onclick={() => act(() => markKeys(it.open, 'accepted', false))}>✓ Accept {it.side === 'old' ? 'removed ' : ''}{itemLabel(it.item)} <span class="muted">{it.open.length} lines</span></button>
+      {/each}
+    {/if}
     <hr />
     <button disabled={m.side !== 'new'} onclick={() => act(() => editFile(m.path, m.line))}>Edit here <kbd>e</kbd></button>
     {#if app.view?.kind === 'chunk' || app.view?.kind === 'file' || app.view?.kind === 'later'}

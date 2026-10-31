@@ -25,6 +25,9 @@ pub struct Snapshot {
     pub planning: bool,
     pub planned_by_ai: bool,
     pub can_undo: bool,
+    /// One-off message about how the change differs from the last session.
+    pub notice: Option<String>,
+    pub last_chunk: Option<crate::domain::ChunkId>,
     pub diff_options: crate::diff::DiffOptions,
     pub stage_mode: crate::stage::StageMode,
     pub instructions: Vec<crate::ai::InstructionFile>,

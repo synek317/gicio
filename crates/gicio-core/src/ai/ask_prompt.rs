@@ -31,6 +31,11 @@ pub fn build_ask_prompt(session: &Session, thread_id: &ThreadId, task: bool, ext
             }
         }
         out.push('\n');
+    } else if thread.anchor.is_none() {
+        // A review-wide request: give the whole picture; the AI reads files as needed.
+        out.push_str("The reviewer's request concerns the whole change, not one place.\n");
+        out.push_str(&super::overview::change_overview(session));
+        out.push_str("\nRead whatever files you need.\n\n");
     }
 
     if let Some(a) = &thread.anchor {
@@ -62,7 +67,7 @@ pub fn build_ask_prompt(session: &Session, thread_id: &ThreadId, task: bool, ext
          fix it by editing files in the working tree: minimal, focused edits, nothing unrelated. Never commit, stage, \
          stash, checkout or otherwise change git state.\n"
     } else {
-        "\nReply to the reviewer's latest message. Do NOT modify any files.\n"
+        "\nReply to the reviewer's latest message. You CANNOT modify files in this conversation (editing is turned off). If the reviewer asks for a change, do not say you will do it: say in one sentence that editing is off here and they can tick \"AI may edit code\" or start an \"AI task\"; you may describe the change briefly.\n"
     });
     out.push_str(
         "Your final message is shown verbatim to the reviewer, in the reviewer's language. Be brief and strictly on topic: \

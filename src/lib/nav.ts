@@ -1,9 +1,11 @@
+import { api } from './api';
 import { app, type View } from './state.svelte';
 
 const scroller = () => document.getElementById('diff-scroll');
 
 function show(view: View, scroll = 0) {
   app.view = view;
+  if (view.kind === 'chunk') api.setLastChunk(view.id).catch(() => {});
   app.selection = [];
   app.selAnchor = null;
   app.focusedHunk = app.viewHunks[0]?.id ?? null;

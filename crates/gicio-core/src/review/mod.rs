@@ -1,3 +1,4 @@
+mod anchors;
 mod chunk;
 mod coverage;
 mod export;
@@ -7,10 +8,12 @@ mod marks;
 mod reconcile;
 mod session;
 mod session_findings;
+mod signature;
 mod snapshot;
 mod state;
 mod thread;
 
+pub use anchors::locate;
 pub use chunk::{Chunk, ChunkOrigin, HunkPart, HunkRef, Note, PlannedChunk, PlannedItem};
 pub use coverage::Coverage;
 pub use export::export_markdown;
@@ -19,6 +22,7 @@ pub use fallback_plan::fallback_plan;
 pub use marks::{LineKey, Mark, MarkStatus, Marks};
 pub use reconcile::{reconcile, FollowUp};
 pub use session::{RefreshReport, Session};
+pub use signature::{compare, line_signature, similarity};
 pub use snapshot::Snapshot;
 pub use state::ReviewState;
 pub use thread::{Anchor, Author, Message, MessageKind, Thread, ThreadStatus};

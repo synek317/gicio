@@ -22,6 +22,11 @@ impl Effort {
         }
     }
 
+    /// Copilot CLI accepts the same names as Claude.
+    pub fn copilot(self) -> &'static str {
+        self.claude()
+    }
+
     pub fn codex(self) -> &'static str {
         match self {
             Effort::Low => "low",

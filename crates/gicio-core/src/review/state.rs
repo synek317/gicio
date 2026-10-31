@@ -27,12 +27,18 @@ pub struct ReviewState {
     pub summary: Option<Message>,
     #[serde(default)]
     pub findings: Vec<super::Finding>,
+    /// Fingerprint of the change at the last save, to recognise it next time.
+    #[serde(default)]
+    pub line_signature: Vec<u64>,
+    /// The step the reviewer was on.
+    #[serde(default)]
+    pub last_chunk: Option<ChunkId>,
     next_id: u64,
 }
 
 impl ReviewState {
     pub fn new(repo: RepoRoot, base_ref: GitRef, base_commit: CommitId, backend: AiBackend) -> Self {
-        Self { repo, base_ref, base_commit, backend, chunks: Vec::new(), marks: Marks::default(), threads: Vec::new(), planned_by_ai: false, diff_options: Default::default(), stage_mode: Default::default(), chat: Vec::new(), summary: None, findings: Vec::new(), next_id: 1 }
+        Self { repo, base_ref, base_commit, backend, chunks: Vec::new(), marks: Marks::default(), threads: Vec::new(), planned_by_ai: false, diff_options: Default::default(), stage_mode: Default::default(), chat: Vec::new(), summary: None, findings: Vec::new(), line_signature: Vec::new(), last_chunk: None, next_id: 1 }
     }
 
     fn next(&mut self) -> u64 {

@@ -2,6 +2,8 @@
   import { settings } from '../app-settings.svelte';
   import { ACTIONS, prettyCombo } from '../keymap';
   import SettingsModal from './SettingsModal.svelte';
+  import BlankLinesPrompt from './BlankLinesPrompt.svelte';
+  import RenameDialog from './RenameDialog.svelte';
 
   const MOUSE = [
     ['click gutter', 'select a line; shift-click range; ⌘-click toggle; drag to select'],
@@ -47,6 +49,8 @@
 {/if}
 
 {#if settings.open}<SettingsModal />{/if}
+{#if app.blankPrompt}<BlankLinesPrompt />{/if}
+{#if app.rename}<RenameDialog />{/if}
 
 <div class="toasts">
   {#each app.toasts as t (t.id)}

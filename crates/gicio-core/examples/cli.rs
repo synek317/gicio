@@ -10,14 +10,19 @@ fn side_new() -> Side {
 }
 
 fn anchor_at(path: FilePath, side: Side, line: u32, excerpt: String) -> Anchor {
-    Anchor { path, side, start: line, end: line, excerpt }
+    Anchor { path, side, start: line, end: line, excerpt, outdated: false }
 }
 use std::path::PathBuf;
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> anyhow::Result<()> {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    let backend = AiBackend::default();
+    let mut backend = AiBackend::default();
+    match std::env::var("GICIO_ENGINE").as_deref() {
+        Ok("codex") => backend.engine = ai::Engine::Codex,
+        Ok("copilot") => backend.engine = ai::Engine::Copilot,
+        _ => {}
+    }
     let mut s = Session::open(&PathBuf::from(&args[0]), GitRef::new(&args[1])?, backend.clone(), gicio_core::stage::StageMode::Memory)?;
     match args.get(2).map(String::as_str) {
         Some("plan") => {
@@ -108,6 +113,62 @@ async fn main() -> anyhow::Result<()> {
             ]);
             s.save()?;
             std::fs::write(&args[3], serde_json::to_vec(&serde_json::json!({"snapshot": s.snapshot(), "texts": texts, "jobs": jobs}))?)?;
+        }
+        Some("rename") => {
+            // rename <path> <line0> <col0> <new>: accept everything first, then rename with RA.
+            let keys: Vec<_> = s.files.iter().flat_map(|f| f.hunks.iter().flat_map(move |h| h.lines.iter().filter_map(move |l| l.review_pos().map(|(side, line)| gicio_core::review::LineKey { path: f.path.clone(), side, line })))).take(20).collect();
+            s.set_marks(keys, Some(gicio_core::review::MarkStatus::Accepted));
+            let accepted_before = Vec::<gicio_core::review::Mark>::from(s.state.marks.clone()).len();
+            let ra = gicio_core::lsp::RustAnalyzer::start(s.state.repo.clone()).await?;
+            let path = gicio_core::domain::FilePath::new(&args[3])?;
+            let (line, col): (u32, u32) = (args[4].parse()?, args[5].parse()?);
+            for _ in 0..90 {
+                tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+                if let Ok(Some(_)) = ra.hover(&path, line, col).await { break; }
+            }
+            println!("prepare: {:?}", ra.prepare_rename(&path, line, col).await?);
+            let ops = ra.rename(&path, line, col, &gicio_core::lsp::NewName::new(&args[6])?).await?;
+            let paths: Vec<_> = ops.iter().flat_map(|o| o.paths()).filter_map(|p| s.state.repo.relative(p)).collect();
+            println!("ops: {} files, {} edits", ops.len(), ops.iter().map(|o| o.edit_count()).sum::<usize>());
+            s.record_rename(&paths, &[], true, None, || gicio_core::lsp::apply_file_ops(&ops))?;
+            let marks: Vec<gicio_core::review::Mark> = s.state.marks.clone().into();
+            println!("marks before {accepted_before}, after {} ({} accepted)", marks.len(), marks.iter().filter(|m| m.status == gicio_core::review::MarkStatus::Accepted).count());
+            return Ok(());
+        }
+        Some("anchors") => {
+            let path = FilePath::new("src/item.rs")?;
+            let excerpt = s.excerpt_of(&path, Side::New, 11, 11);
+            let t = s.create_thread(None, Some(Anchor { path: path.clone(), side: Side::New, start: 11, end: 11, excerpt, outdated: false }), false, false);
+            let show = |s: &Session, what: &str| {
+                let a = s.thread(&t).unwrap().anchor.clone().unwrap();
+                println!("{what}: lines {}-{} outdated={} ({:?})", a.start, a.end, a.outdated, a.excerpt.trim());
+            };
+            show(&s, "created");
+            let abs = s.state.repo.join(&path);
+            let text = std::fs::read_to_string(&abs)?;
+            std::fs::write(&abs, format!("// one\n// two\n// three\n{text}"))?;
+            s.refresh(None)?;
+            show(&s, "after 3 lines inserted above");
+            let without: String = text.lines().filter(|l| !l.contains("to_lowercase")).map(|l| format!("{l}\n")).collect();
+            std::fs::write(&abs, without)?;
+            s.refresh(None)?;
+            show(&s, "after the line was deleted");
+            std::fs::write(&abs, &text)?;
+            s.refresh(None)?;
+            show(&s, "after it came back");
+            return Ok(());
+        }
+        Some("status") => {
+            let marks: Vec<gicio_core::review::Mark> = s.state.marks.clone().into();
+            println!("notice: {:?}\nchunks: {:?}\nmarks: {}", s.notice, s.state.chunks.iter().map(|c| c.title.clone()).collect::<Vec<_>>(), marks.len());
+            return Ok(());
+        }
+        Some("mark") => {
+            let keys: Vec<_> = s.files.iter().flat_map(|f| f.hunks.iter().flat_map(move |h| h.lines.iter().filter_map(move |l| l.review_pos().map(|(side, line)| gicio_core::review::LineKey { path: f.path.clone(), side, line })))).take(8).collect();
+            s.set_marks(keys, Some(gicio_core::review::MarkStatus::Accepted));
+            s.save()?;
+            println!("marked 8 lines");
+            return Ok(());
         }
         Some("stage") => {
             // Re-open in index mode and accept every other added line of src/store.rs.

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { exportReview, reviewWithAi, runTool } from '../review-actions';
-  import { run } from '../actions';
+  import { openAiTask, run } from '../actions';
   import { api } from '../api';
   import { app } from '../state.svelte';
 
@@ -21,6 +21,8 @@
     <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
     <div class="menu-bg" onclick={() => (open = false)}></div>
     <div class="menu dropdown">
+      <button onclick={() => act(openAiTask)}>Give the AI a task…</button>
+      <hr />
       <button onclick={() => act(() => reviewWithAi({ kind: 'all' }))}>AI review: whole change</button>
       <button disabled={!chunkId} onclick={() => act(() => chunkId && reviewWithAi({ kind: 'chunk', id: chunkId }))}>AI review: this step</button>
       <hr />

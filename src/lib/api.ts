@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import type { DiffOptions, FindingStatus, ReviewScope, StageMode, Symbol, Tool, AiBackend, AnchorInput, FileTexts, JobInfo, LineKey, LspStatus, MarkStatus, SendMode, Snapshot, SourceLocation, ThreadStatus } from './types';
+import type { LaunchArgs, DiffOptions, FindingStatus, ReviewScope, StageMode, Symbol, Tool, AiBackend, AnchorInput, FileTexts, JobInfo, LineKey, LspStatus, MarkStatus, SendMode, Snapshot, SourceLocation, ThreadStatus } from './types';
 
 export const inTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
@@ -12,6 +12,7 @@ async function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T> 
 export const api = {
   openSession: (repo: string, base: string, backend: AiBackend, stageMode: StageMode) => call<Snapshot>('open_session', { repo, base, backend, stageMode }),
   getSession: () => call<Snapshot>('get_session'),
+  launchArgs: () => call<LaunchArgs | null>('launch_args'),
   refresh: () => call<Snapshot>('refresh'),
   listRefs: (repo: string) => call<string[]>('list_refs', { repo }),
   fileTexts: (path: string) => call<FileTexts>('file_texts', { path }),
@@ -27,6 +28,7 @@ export const api = {
   listJobs: () => call<JobInfo[]>('list_jobs'),
   cancelJob: (id: string) => call<void>('cancel_job', { id }),
   setBackend: (backend: AiBackend) => call<Snapshot>('set_backend', { backend }),
+  aiTools: () => call<Record<string, boolean>>('ai_tools'),
   getAppSettings: () => call<unknown>('get_app_settings'),
   saveAppSettings: (settings: unknown) => call<void>('save_app_settings', { settings }),
   chatSend: (body: string, allowEdits: boolean) => call<Snapshot>('chat_send', { body, allowEdits }),
@@ -42,7 +44,13 @@ export const api = {
   commit: (message: string) => call<[string, Snapshot]>('commit', { message }),
   runTool: (tool: Tool) => call<string>('run_tool', { tool }),
   setDiffOptions: (options: DiffOptions) => call<Snapshot>('set_diff_options', { options }),
+  setStageMode: (mode: StageMode) => call<Snapshot>('set_stage_mode', { mode }),
+  planByFiles: () => call<Snapshot>('plan_by_files'),
+  setLastChunk: (chunk: string | null) => call<void>('set_last_chunk', { chunk }),
   writeTextFile: (path: string, text: string) => call<void>('write_text_file', { path, text }),
+  lspPrepareRename: (path: string, line: number, character: number) => call<string | null>('lsp_prepare_rename', { path, line, character }),
+  lspRename: (path: string, line: number, character: number, newName: string, keepAccepted: boolean, after: string | null) =>
+    call<{ files: number; edits: number }>('lsp_rename', { path, line, character, newName, keepAccepted, after }),
   lspSymbols: (path: string) => call<Symbol[]>('lsp_symbols', { path }),
   setThreadStatus: (thread: string, status: ThreadStatus) => call<Snapshot>('set_thread_status', { thread, status }),
   lspStatus: () => call<LspStatus>('lsp_status'),
@@ -64,4 +72,12 @@ export function onJobs(cb: (jobs: JobInfo[]) => void, onLog: (id: string, line: 
   listen<JobInfo[]>('jobs', (e) => cb(e.payload)).then((u) => offs.push(u));
   listen<{ id: string; line: string }>('job-log', (e) => onLog(e.payload.id, e.payload.line)).then((u) => offs.push(u));
   return () => offs.forEach((f) => f());
+}
+
+/** Files changed on disk outside gicio and the diff was re-read. */
+export function onWorktreeChanged(cb: (files: string[]) => void): () => void {
+  if (!inTauri) return () => {};
+  let unlisten: (() => void) | null = null;
+  listen<{ files: string[] }>('worktree-changed', (e) => cb(e.payload.files)).then((u) => (unlisten = u));
+  return () => unlisten?.();
 }

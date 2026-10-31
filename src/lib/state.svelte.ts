@@ -26,7 +26,8 @@ class AppState {
   focusedHunk = $state<string | null>(null);
   /** Text to prefill the next composer with (e.g. from a finding). */
   composerDraft = $state('');
-  composer = $state<{ anchor: AnchorInput | null; chunk: string | null } | null>(null);
+  /** `task`: a review-wide job for the AI rather than a comment on lines. */
+  composer = $state<{ anchor: AnchorInput | null; chunk: string | null; task?: boolean } | null>(null);
   activeThread = $state<string | null>(null);
   sidebarTab = $state<'queue' | 'files' | 'later'>('queue');
   showAllThreads = $state(false);
@@ -37,6 +38,16 @@ class AppState {
   hover = $state<HoverInfo | null>(null);
   menu = $state<ContextMenu | null>(null);
   editorDirty = $state(false);
+  /** Open rename dialog: where the symbol is (1-based line, UTF-16 column). */
+  rename = $state<{ path: string; line: number; character: number } | null>(null);
+  /** Bumped when files change under an open file view, so it reloads. */
+  fileRev = $state(0);
+  /** Code position under the pointer (for F2 rename in the diff). */
+  pointerCode: { path: string; line: number; character: number } | null = null;
+  /** Lines an accept button under the pointer would accept. */
+  preview = $state<Set<string>>(new Set());
+  /** A file where only blank lines are left unaccepted, waiting for the user's answer. */
+  blankPrompt = $state<{ path: string; keys: string[] } | null>(null);
   /** Extra context lines shown around hunks (by hunk view id). */
   expand = $state<Record<string, { before: number; after: number }>>({});
   /** Collapsed file blocks, by `${view id}|${path}`. */
@@ -74,7 +85,8 @@ class AppState {
     const m = new Map<string, Thread[]>();
     for (const t of this.snap?.threads ?? []) {
       const a = t.anchor;
-      if (!a) continue;
+      // A discussion whose code is gone has no place in the code any more.
+      if (!a || a.outdated) continue;
       for (let l = a.start; l <= a.end; l++) {
         const k = `${a.path}|${a.side}|${l}`;
         m.set(k, [...(m.get(k) ?? []), t]);
@@ -87,7 +99,7 @@ class AppState {
   findingLines = $derived.by(() => {
     const m = new Map<string, Finding[]>();
     for (const f of this.snap?.findings ?? []) {
-      if (f.status !== 'open' && f.status !== 'fixing') continue;
+      if ((f.status !== 'open' && f.status !== 'fixing') || f.outdated) continue;
       for (let l = f.line; l <= Math.max(f.line, f.endLine); l++) {
         const k = `${f.path}|${f.side}|${l}`;
         m.set(k, [...(m.get(k) ?? []), f]);
@@ -96,13 +108,16 @@ class AppState {
     return m;
   });
 
+  /** The topmost file of the view that is on screen; the file tree follows it. */
+  currentFile = $derived(this.viewHunks.map((h) => h.path).find((p) => this.onScreen[p]) ?? null);
+
   pendingReview = $derived((this.snap?.threads ?? []).filter((t) => t.messages.some((m) => m.pending)).length);
 
   /** `${path}|${side}|${line}` -> AI notes from the plan. */
   noteLines = $derived.by(() => {
     const m = new Map<string, Note[]>();
     for (const c of this.snap?.chunks ?? [])
-      for (const n of c.notes ?? []) {
+      for (const n of (c.notes ?? []).filter((n) => !n.outdated)) {
         const k = `${n.path}|${n.side}|${n.line}`;
         m.set(k, [...(m.get(k) ?? []), n]);
       }
@@ -143,10 +158,10 @@ class AppState {
     return this.jobs.findLast((j) => j.thread === thread && (j.status === 'running' || j.status === 'queued'));
   }
 
-  toast(text: string, kind: Toast['kind'] = 'info') {
+  toast(text: string, kind: Toast['kind'] = 'info', ms?: number) {
     const id = Date.now() + Math.random();
     this.toasts = [...this.toasts, { id, text, kind }];
-    setTimeout(() => (this.toasts = this.toasts.filter((t) => t.id !== id)), kind === 'error' ? 9000 : 3500);
+    setTimeout(() => (this.toasts = this.toasts.filter((t) => t.id !== id)), ms ?? (kind === 'error' ? 9000 : 3500));
   }
 }
 

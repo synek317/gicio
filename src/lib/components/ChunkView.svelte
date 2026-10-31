@@ -7,6 +7,9 @@
   import FileBlock from './FileBlock.svelte';
   import ProgressBar from './ProgressBar.svelte';
   import SelectionBar from './SelectionBar.svelte';
+  import { previewOff, previewOn } from '../preview';
+  import { trackVisibleFiles, updateVisibleFiles } from '../files-nav';
+  import { tick } from 'svelte';
 
   const v = $derived(app.view);
   const chunk = $derived(v?.kind === 'chunk' ? app.chunk(v.id) : undefined);
@@ -25,6 +28,15 @@
   });
 
   let headH = $state(0);
+
+  $effect(() => trackVisibleFiles());
+  // Blocks appear, collapse or grow: recompute after the DOM settles.
+  $effect(() => {
+    void app.viewHunks;
+    void app.collapsed;
+    void app.expand;
+    tick().then(updateVisibleFiles);
+  });
 
   function unacceptView() {
     markKeys(app.orderedKeys.filter((k) => app.marks.get(k) === 'accepted'), null, false);
@@ -51,7 +63,7 @@
       <button class="ghost" onclick={() => openComposer(false)}>Ask about this chunk</button>
       {#if prog.pending}
         <button onclick={() => markView('deferred')}>Put rest off</button>
-        <button class="primary" onclick={acceptRestAndNext} title="Shift+A">Accept rest & next</button>
+        <button class="primary" onmouseenter={() => previewOn(app.orderedKeys)} onmouseleave={previewOff} onclick={acceptRestAndNext} title="Shift+A">Accept rest & next</button>
       {/if}
       {#if prog.accepted}
         <button class="ghost" onclick={unacceptView} title="Take back every acceptance in this step">↺ Unaccept step</button>

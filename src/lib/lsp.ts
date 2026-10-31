@@ -21,6 +21,8 @@ export function columnAt(x: number, y: number): number | null {
 
 export function hoverCode(e: MouseEvent, path: string, line: number) {
   if (!lspUsable(path)) return;
+  const character = columnAt(e.clientX, e.clientY);
+  app.pointerCode = character == null ? null : { path, line, character };
   clearTimeout(timer);
   const { clientX: x, clientY: y } = e;
   timer = setTimeout(async () => {

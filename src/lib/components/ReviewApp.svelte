@@ -16,7 +16,7 @@
   <Sidebar />
   <main id="diff-scroll" class="main" class:no-scroll={v?.kind === 'source'}>
     {#if v?.kind === 'source'}
-      {#key v.absPath}<FileView absPath={v.absPath} repoPath={v.repoPath} line={v.line} title={v.title} />{/key}
+      {#key `${v.absPath}#${app.fileRev}`}<FileView absPath={v.absPath} repoPath={v.repoPath} line={v.line} title={v.title} />{/key}
     {:else if v?.kind === 'refs'}
       <RefsView title={v.title} locs={v.locs} />
     {:else if app.snap?.files.length}

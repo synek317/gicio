@@ -10,6 +10,7 @@
 
   const icons = { todo: '○', started: '◐', deferred: '⏸', done: '✓' };
   let open = $state(true);
+  let row: HTMLElement | undefined = $state();
   const hunks = $derived(node.files.flatMap((f) => f.hunks));
   const p = $derived(hunksProgress(hunks, app.marks));
   const st = $derived(progressState(p));
@@ -19,10 +20,18 @@
   const paths = $derived(node.files.map((f) => f.path));
   const onScreen = $derived(paths.some((p) => app.onScreen[p]));
   const hovered = $derived(!!app.hoverPath && paths.includes(app.hoverPath));
+  const current = $derived(!!app.currentFile && paths.includes(app.currentFile));
+
+  // Follow the file being read: unfold its folders and keep its row visible.
+  $effect(() => {
+    if (!current) return;
+    if (!file) open = true;
+    else row?.scrollIntoView({ block: 'nearest' });
+  });
 </script>
 
 <li class="tnode {st}">
-  <div class="trow" class:active class:onscreen={onScreen} class:hovered style="padding-left:{depth * 12 + 4}px">
+  <div class="trow" bind:this={row} class:active class:onscreen={onScreen} class:hovered style="padding-left:{depth * 12 + 4}px">
     {#if file}
       <button class="tname" onclick={() => go({ kind: 'file', path: file.path })} title={file.path}>
         <span class="qicon">{icons[st]}</span>

@@ -15,9 +15,11 @@ const MAX_PEEK_BYTES: u64 = 4 * 1024 * 1024;
 pub async fn open_session(app: AppHandle, state: State<'_, AppState>, repo: PathBuf, base: GitRef, backend: AiBackend, stage_mode: StageMode) -> Result<Snapshot, String> {
     let session = tauri::async_runtime::spawn_blocking(move || Session::open(&repo, base, backend, stage_mode)).await.map_err(err)?.map_err(err)?;
     let root = session.state.repo.clone();
+    let base = session.state.base_commit.clone();
     let snap = publish(&app, &session);
     state.replace_session(session);
-    start_lsp(app.clone(), root);
+    start_lsp(app.clone(), root.clone());
+    crate::watch::watch_worktree(app.clone(), root, base);
     Ok(snap)
 }
 
@@ -83,4 +85,26 @@ pub fn set_diff_options(app: AppHandle, state: State<'_, AppState>, options: gic
 #[tauri::command]
 pub fn write_text_file(path: PathBuf, text: String) -> Result<(), String> {
     std::fs::write(path, text).map_err(err)
+}
+
+#[tauri::command]
+pub fn set_stage_mode(app: AppHandle, state: State<'_, AppState>, mode: StageMode) -> Result<Snapshot, String> {
+    let mut s = state.session()?;
+    s.set_stage_mode(mode).map_err(err)?;
+    Ok(publish(&app, &s))
+}
+
+/// Review file by file instead of in AI-planned steps.
+#[tauri::command]
+pub fn plan_by_files(app: AppHandle, state: State<'_, AppState>) -> Result<Snapshot, String> {
+    let mut s = state.session()?;
+    s.plan_by_files();
+    Ok(publish(&app, &s))
+}
+
+/// Remembers the step the reviewer is on, to return there next time.
+#[tauri::command]
+pub fn set_last_chunk(state: State<'_, AppState>, chunk: Option<gicio_core::domain::ChunkId>) -> Result<(), String> {
+    state.session()?.set_last_chunk(chunk);
+    Ok(())
 }

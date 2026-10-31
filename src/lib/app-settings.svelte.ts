@@ -1,19 +1,26 @@
 import { api, inTauri } from './api';
 import type { BackendForm } from './backend-form';
 import { defaultKeybindings, type Keybindings } from './keymap';
+import { defaultStartOptions, type StartOptions } from './start-options';
 
 export interface Prefs {
   layout: 'split' | 'unified';
-  order: 'ai' | 'files';
   /** After "Accept rest", jump to the next step with pending lines. */
   autoAdvance: boolean;
   notesExpanded: boolean;
   confirmStartOver: boolean;
   hoverDelayMs: number;
+  /** When a file has only blank lines left unaccepted. */
+  blankLines: 'ask' | 'accept' | 'never';
+  /** After a rename, lines that were already accepted. */
+  renameAccepted: 'ask' | 'keep' | 'review';
 }
 
 export interface AppSettings {
   defaultBackend: BackendForm;
+  /** Defaults for a new review; with `skipStartScreen` they are used without asking. */
+  start: StartOptions;
+  skipStartScreen: boolean;
   aiInstructions: string;
   /** Leave lock files and generated code out of AI planning, reviews and summaries. */
   skipLowValue: boolean;
@@ -37,7 +44,9 @@ export function defaultSettings(): AppSettings {
     aiInstructions: '',
     skipLowValue: true,
     skipPatterns: [...DEFAULT_SKIP],
-    prefs: { layout: 'split', order: 'ai', autoAdvance: true, notesExpanded: false, confirmStartOver: true, hoverDelayMs: 450 },
+    start: defaultStartOptions(),
+    skipStartScreen: false,
+    prefs: { layout: 'split', autoAdvance: true, notesExpanded: false, confirmStartOver: true, hoverDelayMs: 450, blankLines: 'ask', renameAccepted: 'ask' },
     keybindings: defaultKeybindings(),
   };
 }
@@ -45,8 +54,12 @@ export function defaultSettings(): AppSettings {
 function merge(raw: Partial<AppSettings> | null): AppSettings {
   const d = defaultSettings();
   if (!raw) return d;
+  // Older settings kept the review order among the preferences.
+  const legacyOrder = (raw.prefs as { order?: 'ai' | 'files' } | undefined)?.order;
   return {
     defaultBackend: { ...d.defaultBackend, ...raw.defaultBackend },
+    start: { ...d.start, ...(legacyOrder ? { order: legacyOrder } : {}), ...raw.start },
+    skipStartScreen: raw.skipStartScreen ?? false,
     aiInstructions: raw.aiInstructions ?? '',
     skipLowValue: raw.skipLowValue ?? true,
     skipPatterns: raw.skipPatterns ?? [...DEFAULT_SKIP],

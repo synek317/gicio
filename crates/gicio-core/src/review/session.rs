@@ -1,10 +1,14 @@
-use super::{fallback_plan, reconcile, Chunk, ChunkOrigin, Coverage, FollowUp, HunkRef, LineKey, Mark, MarkStatus, PlannedChunk, ReviewState, Snapshot};
+use super::{compare, line_signature, similarity, fallback_plan, reconcile, Chunk, ChunkOrigin, Coverage, FollowUp, HunkRef, LineKey, Mark, MarkStatus, PlannedChunk, ReviewState, Snapshot};
 use super::{Anchor, Message, Thread, ThreadStatus};
 use crate::ai::AiBackend;
 use crate::diff::{load_diff, FileDiff, Hunk, Side};
 use crate::domain::{ChunkId, FilePath, GitRef, HunkId, ThreadId};
 use crate::stage::StageMode;
+use crate::store::StoreKey;
 use crate::{git, store};
+
+/// Below this share of common changed lines, a stored review is for a different change.
+const FRESH_BELOW: f64 = 0.2;
 use anyhow::{bail, Context, Result};
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -15,6 +19,7 @@ pub struct Session {
     pub planning: bool,
     pub chat_busy: bool,
     pub summary_busy: bool,
+    pub notice: Option<String>,
     version: u64,
     undo: Vec<Vec<(LineKey, Option<Mark>)>>,
     store_path: PathBuf,
@@ -30,22 +35,50 @@ impl Session {
     pub fn open(path: &Path, base: GitRef, backend: AiBackend, stage_mode: StageMode) -> Result<Self> {
         let root = git::toplevel(path)?;
         let commit = git::resolve_commit(&root, &base)?;
-        let store_path = store::path_for(&root, &commit)?;
-        let restored = store::load(&store_path).unwrap_or(None);
+        let store_path = store::path_for(&root, &StoreKey::for_base(&base))?;
+        let mut restored = store::load(&store_path).unwrap_or(None);
+        if restored.is_none() {
+            restored = store::load(&store::legacy_path(&root, &commit)?).unwrap_or(None);
+        }
+        let files = load_diff(&root, &commit, restored.as_ref().map(|s| s.diff_options).unwrap_or_default())?;
+
+        // Same change with some edits, or something else entirely?
+        let signature = line_signature(&files);
+        let mut notice = None;
+        if let Some(prev) = &restored
+            && !prev.line_signature.is_empty()
+        {
+            let (common, gone, added) = compare(&prev.line_signature, &signature);
+            if similarity(&prev.line_signature, &signature) < FRESH_BELOW && !signature.is_empty() {
+                let archived = store::archive(&store_path)?;
+                notice = Some(format!(
+                    "The changes are very different from your last review here (only {common} of {} changed lines in common), so this is a fresh review.{}",
+                    common + gone + added,
+                    archived.map(|p| format!(" The previous one is kept in {}.", p.display())).unwrap_or_default()
+                ));
+                restored = None;
+            } else if gone + added > 0 {
+                notice = Some(format!(
+                    "Since your last session {added} changed line(s) are new and {gone} are gone. The plan, your marks on unchanged lines and the discussions are kept; new and changed lines are pending again."
+                ));
+            }
+        }
+
         let resumed = restored.is_some();
-        let mut state = restored.unwrap_or_else(|| ReviewState::new(root, base.clone(), commit, backend.clone()));
+        let mut state = restored.unwrap_or_else(|| ReviewState::new(root, base.clone(), commit.clone(), backend.clone()));
         let was_staging = resumed && state.stage_mode == StageMode::Index;
         state.backend = backend;
         state.base_ref = base;
+        state.base_commit = commit;
         state.stage_mode = stage_mode;
         state.threads.iter_mut().for_each(|t| t.busy = false);
-        let files = load_diff(&state.repo, &state.base_commit, state.diff_options)?;
-        let mut session = Session { state, files: Vec::new(), planning: false, chat_busy: false, summary_busy: false, version: 0, undo: Vec::new(), store_path };
+        let mut session = Session { state, files: Vec::new(), planning: false, chat_busy: false, summary_busy: false, notice, version: 0, undo: Vec::new(), store_path };
         if resumed {
             session.install_files(files, None);
         } else {
             session.files = files;
             session.apply_plan(Vec::new(), fallback_plan(&session.files), false);
+            session.state.line_signature = signature;
         }
         if stage_mode == StageMode::Index {
             if !was_staging {
@@ -76,6 +109,8 @@ impl Session {
             planning: self.planning,
             planned_by_ai: self.state.planned_by_ai,
             can_undo: !self.undo.is_empty(),
+            notice: self.notice.clone(),
+            last_chunk: self.state.last_chunk.clone(),
             diff_options: self.state.diff_options,
             stage_mode: self.state.stage_mode,
             instructions: crate::ai::discover_instructions(&self.state.repo, &self.state.backend.engine),
@@ -118,7 +153,9 @@ impl Session {
             .collect();
         touched.sort();
         touched.dedup();
+        self.state.line_signature = line_signature(&files);
         self.files = files;
+        self.relocate_anchors();
         if !touched.is_empty() {
             self.undo.clear();
         }
@@ -215,21 +252,72 @@ impl Session {
     /// Writes the reviewer's own edit to disk. Lines the edit introduces count as accepted:
     /// nobody needs to review what they just typed themselves.
     pub fn save_user_edit(&mut self, path: &FilePath, text: &str, after: Option<ChunkId>) -> Result<RefreshReport> {
-        let changed = |files: &[FileDiff]| -> HashSet<(Side, String)> {
-            files.iter().filter(|f| &f.path == path).flat_map(|f| f.hunks.iter()).flat_map(|h| h.lines.iter())
-                .filter_map(|l| l.review_pos().map(|(side, _)| (side, l.text.clone()))).collect()
-        };
-        let before = changed(&self.files);
         let abs = self.state.repo.join(path);
-        if let Some(dir) = abs.parent() {
-            std::fs::create_dir_all(dir)?;
-        }
-        std::fs::write(&abs, text).with_context(|| format!("cannot write {path}"))?;
+        self.record_user_change(std::slice::from_ref(path), after, || {
+            if let Some(dir) = abs.parent() {
+                std::fs::create_dir_all(dir)?;
+            }
+            std::fs::write(&abs, text).with_context(|| format!("cannot write {path}"))
+        })
+    }
+
+    /// Runs a change the reviewer made themselves (an edit, a rename) to `paths`, re-reads the
+    /// diff and accepts the lines the change introduced: nobody needs to review what they did.
+    pub fn record_user_change(&mut self, paths: &[FilePath], after: Option<ChunkId>, change: impl FnOnce() -> Result<()>) -> Result<RefreshReport> {
+        let wanted: HashSet<&FilePath> = paths.iter().collect();
+        let lines = |files: &[FileDiff]| -> HashSet<(FilePath, Side, String)> {
+            files.iter().filter(|f| wanted.contains(&f.path)).flat_map(|f| f.hunks.iter().flat_map(move |h| h.lines.iter().map(move |l| (f, l))))
+                .filter_map(|(f, l)| l.review_pos().map(|(side, _)| (f.path.clone(), side, l.text.clone()))).collect()
+        };
+        let before = lines(&self.files);
+        change()?;
         let report = self.refresh(Some((after, "Your edits".into(), None)))?;
-        let mine: Vec<LineKey> = self.files.iter().filter(|f| &f.path == path).flat_map(|f| f.hunks.iter()).flat_map(|h| h.lines.iter())
-            .filter_map(|l| l.review_pos().filter(|(side, _)| !before.contains(&(*side, l.text.clone()))).map(|(side, line)| LineKey { path: path.clone(), side, line }))
+        let mine: Vec<LineKey> = self.files.iter().filter(|f| wanted.contains(&f.path)).flat_map(|f| f.hunks.iter().flat_map(move |h| h.lines.iter().map(move |l| (f, l))))
+            .filter_map(|(f, l)| l.review_pos().filter(|(side, _)| !before.contains(&(f.path.clone(), *side, l.text.clone()))).map(|(side, line)| LineKey { path: f.path.clone(), side, line }))
             .collect();
         self.set_marks(mine, Some(MarkStatus::Accepted));
+        self.save()?;
+        Ok(report)
+    }
+
+    /// A symbol rename by the reviewer. Lines it adds to the change are the reviewer's own edit and
+    /// count as accepted. Lines that were already part of the change keep their status: accepted
+    /// stays accepted with `keep_accepted`, otherwise it needs a look again; pending stays pending.
+    /// `moved` lists files the rename moved (old, new).
+    pub fn record_rename(&mut self, paths: &[FilePath], moved: &[(FilePath, FilePath)], keep_accepted: bool, after: Option<ChunkId>, change: impl FnOnce() -> Result<()>) -> Result<RefreshReport> {
+        let wanted: HashSet<&FilePath> = paths.iter().collect();
+        let before: HashMap<(FilePath, u32), (Option<MarkStatus>, String)> = self
+            .files
+            .iter()
+            .filter(|f| wanted.contains(&f.path))
+            .flat_map(|f| f.hunks.iter().flat_map(move |h| h.lines.iter().map(move |l| (f, l))))
+            .filter(|(_, l)| l.kind == crate::diff::LineKind::Added)
+            .filter_map(|(f, l)| {
+                let line = l.new_no?;
+                let status = self.state.marks.status(&LineKey { path: f.path.clone(), side: Side::New, line });
+                Some(((f.path.clone(), line), (status, l.text.clone())))
+            })
+            .collect();
+        change()?;
+        let report = self.refresh(Some((after, "Your edits".into(), None)))?;
+        let previous_path = |p: &FilePath| moved.iter().find(|(_, to)| to == p).map(|(from, _)| from.clone()).unwrap_or_else(|| p.clone());
+        let (mut accept, mut defer, mut reset) = (Vec::new(), Vec::new(), Vec::new());
+        for f in self.files.iter().filter(|f| wanted.contains(&f.path)) {
+            for l in f.hunks.iter().flat_map(|h| h.lines.iter()).filter(|l| l.kind == crate::diff::LineKind::Added) {
+                let Some(line) = l.new_no else { continue };
+                let key = LineKey { path: f.path.clone(), side: Side::New, line };
+                match before.get(&(previous_path(&f.path), line)) {
+                    Some((_, text)) if *text == l.text => {}
+                    Some((Some(MarkStatus::Accepted), _)) if keep_accepted => accept.push(key),
+                    Some((Some(MarkStatus::Deferred), _)) => defer.push(key),
+                    Some(_) => reset.push(key),
+                    None => accept.push(key),
+                }
+            }
+        }
+        self.set_marks(accept, Some(MarkStatus::Accepted));
+        self.set_marks(defer, Some(MarkStatus::Deferred));
+        self.set_marks(reset, None);
         self.save()?;
         Ok(report)
     }
@@ -241,6 +329,35 @@ impl Session {
         }
         let files: Vec<&FileDiff> = self.files.iter().filter(|f| paths.is_none_or(|p| p.contains(&f.path))).collect();
         crate::stage::sync_index(&self.state.repo, &self.state.base_commit, &files, &self.state.marks, self.state.diff_options)
+    }
+
+    /// Switches between keeping accepted lines in gicio and staging them. Turning staging on
+    /// unstages everything first, so the index holds exactly what is accepted.
+    pub fn set_stage_mode(&mut self, mode: StageMode) -> Result<()> {
+        if mode == self.state.stage_mode {
+            return Ok(());
+        }
+        self.state.stage_mode = mode;
+        if mode == StageMode::Index {
+            git::unstage_all(&self.state.repo)?;
+            self.sync_index(None)?;
+        }
+        self.touch();
+        self.save()
+    }
+
+    /// Replaces the queue with one step per file; marks are kept (they belong to lines).
+    pub fn plan_by_files(&mut self) {
+        let plan = fallback_plan(&self.files);
+        self.apply_plan(Vec::new(), plan, false);
+        self.state.planned_by_ai = false;
+    }
+
+    pub fn set_last_chunk(&mut self, chunk: Option<ChunkId>) {
+        if self.state.last_chunk != chunk {
+            self.state.last_chunk = chunk;
+            let _ = self.save();
+        }
     }
 
     /// Recomputes the diff with other options (e.g. ignoring whitespace).

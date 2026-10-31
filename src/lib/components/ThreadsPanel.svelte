@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { openComposer } from '../actions';
+  import { openAiTask, openComposer } from '../actions';
   import { app } from '../state.svelte';
   import ActivityPanel from './ActivityPanel.svelte';
   import ChatPanel from './ChatPanel.svelte';
@@ -7,17 +7,19 @@
   import { submitReview } from '../review-actions';
   import NewThread from './NewThread.svelte';
   import ThreadCard from './ThreadCard.svelte';
+  import type { Thread } from '../types';
 
   const openFindings = $derived((app.snap?.findings ?? []).filter((f) => f.status === 'open').length);
-  const visible = $derived.by(() => {
-    const all = app.snap?.threads ?? [];
+  const rank = { open: 0, deferred: 1, resolved: 2 };
+  const byStatus = (a: Thread, b: Thread) => rank[a.status] - rank[b.status] || Number(b.id.slice(1)) - Number(a.id.slice(1));
+
+  /** Discussions of what is on screen first; everything else folded below. */
+  const split = $derived.by(() => {
     const v = app.view;
     const paths = new Set(app.viewHunks.map((h) => h.path));
-    const shown = app.showAllThreads
-      ? all
-      : all.filter((t) => t.id === app.activeThread || (v?.kind === 'chunk' && t.chunk === v.id) || (t.anchor && paths.has(t.anchor.path) && v?.kind !== 'chunk'));
-    const rank = { open: 0, deferred: 1, resolved: 2 };
-    return [...shown].sort((a, b) => rank[a.status] - rank[b.status] || Number(b.id.slice(1)) - Number(a.id.slice(1)));
+    const here = (t: Thread) => t.id === app.activeThread || (!t.chunk && !t.anchor) || (v?.kind === 'chunk' && t.chunk === v.id) || (!!t.anchor && paths.has(t.anchor.path) && v?.kind !== 'chunk');
+    const all = app.snap?.threads ?? [];
+    return { here: all.filter(here).sort(byStatus), other: all.filter((t) => !here(t)).sort(byStatus) };
   });
 </script>
 
@@ -30,8 +32,8 @@
     </nav>
     <span class="spacer"></span>
     {#if app.rightTab === 'discussions'}
-      <label class="toggle"><input type="checkbox" bind:checked={app.showAllThreads} /> all</label>
-      <button onclick={() => openComposer()} title="c">New</button>
+      <button onclick={openAiTask} title="Give the AI a task for the whole review, not tied to particular lines (g)">AI task</button>
+      <button onclick={() => openComposer()} title="New comment or question about the selected lines (c)">New</button>
     {/if}
   </header>
   {#if app.pendingReview && app.rightTab === 'discussions'}
@@ -49,13 +51,21 @@
   <div class="threads-body">
     <ActivityPanel />
     {#if app.composer}<NewThread />{/if}
-    {#each visible as t (t.id)}
+    {#each split.here as t (t.id)}
       <ThreadCard thread={t} />
     {:else}
       {#if !app.composer}
         <p class="muted hint">Select lines in the gutter and press <kbd>c</kbd> to write a note, ask the AI now, or add an AI to-do that runs in the background. If the AI edits code, the diff and the queue update.</p>
       {/if}
     {/each}
+    {#if split.other.length}
+      <button class="qhead toggle-head" onclick={() => (app.showAllThreads = !app.showAllThreads)}>
+        {app.showAllThreads ? '▾' : '▸'} Other discussions <span class="muted">({split.other.length}, in other steps)</span>
+      </button>
+      {#if app.showAllThreads}
+        {#each split.other as t (t.id)}<ThreadCard thread={t} />{/each}
+      {/if}
+    {/if}
   </div>
   {/if}
 </aside>

@@ -31,28 +31,13 @@ pub enum SendMode {
 }
 
 fn excerpt(s: &Session, a: &AnchorInput) -> String {
-    let Some(file) = s.file(&a.path) else { return String::new() };
-    let mut lines: Vec<(u32, &str)> = file
-        .hunks
-        .iter()
-        .flat_map(|h| h.lines.iter())
-        .filter_map(|l| {
-            let no = match a.side {
-                Side::Old => l.old_no,
-                Side::New => l.new_no,
-            }?;
-            (a.start..=a.end).contains(&no).then_some((no, l.text.as_str()))
-        })
-        .collect();
-    lines.sort_by_key(|(n, _)| *n);
-    lines.dedup_by_key(|(n, _)| *n);
-    lines.into_iter().map(|(_, t)| t).collect::<Vec<_>>().join("\n")
+    s.excerpt_of(&a.path, a.side, a.start, a.end)
 }
 
 #[tauri::command]
 pub fn create_thread(app: AppHandle, state: State<'_, AppState>, chunk: Option<ChunkId>, anchor: Option<AnchorInput>, allow_edits: bool, todo: bool) -> Result<ThreadId, String> {
     let mut s = state.session()?;
-    let anchor = anchor.map(|a| Anchor { excerpt: excerpt(&s, &a), path: a.path, side: a.side, start: a.start, end: a.end });
+    let anchor = anchor.map(|a| Anchor { excerpt: excerpt(&s, &a), path: a.path, side: a.side, start: a.start, end: a.end, outdated: false });
     let id = s.create_thread(chunk, anchor, allow_edits, todo);
     publish(&app, &s);
     Ok(id)

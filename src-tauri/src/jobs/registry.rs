@@ -137,6 +137,13 @@ impl Jobs {
         }
     }
 
+    /// Whether a job that may edit files (or refreshes the diff itself) is queued or running.
+    pub fn edits_running(&self) -> bool {
+        self.inner.lock().unwrap().list.iter().any(|j| {
+            matches!(j.status, JobStatus::Queued | JobStatus::Running) && !matches!(j.kind, JobKind::Plan | JobKind::Summary | JobKind::AiReview | JobKind::Commit)
+        })
+    }
+
     pub fn list(&self) -> Vec<JobInfo> {
         self.inner.lock().unwrap().list.clone()
     }

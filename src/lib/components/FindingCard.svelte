@@ -21,6 +21,7 @@
     <strong class="ftitle">{f.title}</strong>
     <span class="badge">{f.source}</span>
     {#if f.status !== 'open'}<span class="badge st-{f.status}">{f.status}</span>{/if}
+    {#if f.outdated}<span class="badge outdated" title="The code this finding was about has changed or been removed">outdated</span>{/if}
   </div>
   {#if !compact}
     <button class="link small" onclick={() => revealLine(f.path, f.side, f.line)}>{f.path}:{f.side === 'old' ? '−' : ''}{f.line}{f.endLine > f.line ? `–${f.endLine}` : ''}</button>

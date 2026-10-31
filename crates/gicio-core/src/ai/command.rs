@@ -79,9 +79,12 @@ pub fn prepare(backend: &AiBackend, repo: &RepoRoot, prompt: &str, mode: AccessM
         }
         Engine::Copilot => {
             let mut c = program("copilot")?;
-            c.arg("-p").arg(prompt);
+            c.args(["-s", "--no-color"]).arg("-p").arg(prompt);
             if let Some(m) = model {
                 c.args(["--model", m]);
+            }
+            if let Some(e) = backend.effort {
+                c.args(["--reasoning-effort", e.copilot()]);
             }
             c.arg("--allow-all-tools");
             if !edit {

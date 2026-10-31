@@ -1,20 +1,26 @@
 mod commands;
+mod dock_icon;
 mod jobs;
+mod launch;
 mod publish;
 mod settings;
 mod state;
+mod watch;
 
 use state::AppState;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let launch = launch::LaunchArgs::from_env();
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .manage(AppState::default())
+        .manage(launch::Launch(std::sync::Mutex::new(Some(launch))))
         .setup(|app| {
             use tauri::Manager;
             app.state::<AppState>().settings.load(app.handle());
+            dock_icon::set_dock_icon();
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -44,7 +50,13 @@ pub fn run() {
             commands::tools::run_tool,
             commands::session::set_diff_options,
             commands::session::write_text_file,
+            commands::session::set_stage_mode,
+            commands::session::plan_by_files,
+            commands::session::set_last_chunk,
             commands::lsp::lsp_symbols,
+            commands::lsp::lsp_prepare_rename,
+            commands::lsp::lsp_rename,
+            commands::launch::launch_args,
             commands::chat::chat_send,
             commands::chat::summarize,
             commands::chat::clear_chat,
@@ -53,6 +65,7 @@ pub fn run() {
             commands::jobs::list_jobs,
             commands::jobs::cancel_job,
             commands::jobs::set_backend,
+            commands::jobs::ai_tools,
             commands::lsp::lsp_status,
             commands::lsp::lsp_hover,
             commands::lsp::lsp_definition,

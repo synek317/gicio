@@ -55,9 +55,11 @@ impl RustAnalyzer {
                     "hover": {"contentFormat": ["markdown", "plaintext"]},
                     "definition": {"linkSupport": true},
                     "documentSymbol": {"hierarchicalDocumentSymbolSupport": true},
+                    "rename": {"prepareSupport": true},
                     "synchronization": {"didSave": false}
                 },
-                "general": {"positionEncodings": ["utf-16"]}
+                "general": {"positionEncodings": ["utf-16"]},
+                "workspace": {"workspaceEdit": {"documentChanges": true, "resourceOperations": ["rename"]}}
             },
             "initializationOptions": {"checkOnSave": false, "cachePriming": {"enable": true}}
         });
@@ -121,6 +123,44 @@ impl RustAnalyzer {
         params["context"] = json!({"includeDeclaration": true});
         let res = self.client.request("textDocument/references", params, REQUEST_TIMEOUT).await?;
         Ok(self.locations(res))
+    }
+
+    /// The name a rename at this position would change, or `None` if nothing renamable is there.
+    pub async fn prepare_rename(&self, path: &FilePath, line: u32, character: u32) -> Result<Option<String>> {
+        let uri = self.sync(path).await?;
+        let res = self.client.request("textDocument/prepareRename", Self::position(&uri, line, character), REQUEST_TIMEOUT).await?;
+        if res.is_null() {
+            return Ok(None);
+        }
+        if let Some(p) = res.get("placeholder").and_then(Value::as_str) {
+            return Ok(Some(p.to_string()));
+        }
+        // A bare range: read the name from the file.
+        let range = res.get("range").unwrap_or(&res);
+        let (Some(l), Some(s), Some(e)) = (range.pointer("/start/line").and_then(Value::as_u64), range.pointer("/start/character").and_then(Value::as_u64), range.pointer("/end/character").and_then(Value::as_u64)) else {
+            return Ok(None);
+        };
+        let text = std::fs::read_to_string(self.root.join(path))?;
+        let line: Vec<u16> = text.lines().nth(l as usize).unwrap_or_default().encode_utf16().collect();
+        Ok(line.get(s as usize..e as usize).map(String::from_utf16_lossy))
+    }
+
+    /// The file operations renaming the symbol at this position to `new_name` everywhere.
+    pub async fn rename(&self, path: &FilePath, line: u32, character: u32, new_name: &super::NewName) -> Result<Vec<super::FileOp>> {
+        let uri = self.sync(path).await?;
+        let mut params = Self::position(&uri, line, character);
+        params["newName"] = json!(new_name.as_str());
+        let res = self.client.request("textDocument/rename", params, Duration::from_secs(60)).await?;
+        Ok(super::workspace_edit::parse_workspace_edit(&res))
+    }
+
+    /// Tells the server about files changed on disk by us (after applying a rename).
+    pub async fn files_changed(&self, paths: &[FilePath]) {
+        for p in paths {
+            if self.root.join(p).exists() {
+                let _ = self.sync(p).await;
+            }
+        }
     }
 
     /// Functions, methods, impls etc. of a file as flat line ranges (1-based, inclusive).

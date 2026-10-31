@@ -57,4 +57,9 @@ pub struct Finding {
     pub title: String,
     pub detail: String,
     pub status: FindingStatus,
+    /// The code the finding is about, to follow it when lines move.
+    #[serde(default)]
+    pub code: String,
+    #[serde(default)]
+    pub outdated: bool,
 }

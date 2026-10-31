@@ -27,7 +27,8 @@ and the queue adjusts to its edits.
 **Works with** the AI coding CLIs you already have, with no API keys of its own:
 
 - **Claude Code** (`claude`)
-- **OpenAI Codex CLI** (`codex`)
+- **OpenAI Codex CLI** (`codex`), also the one bundled in the ChatGPT desktop app, signed in with your
+  ChatGPT plan
 - **GitHub Copilot CLI** (`copilot`)
 - **anything else** you can run as a command that reads a prompt on stdin and prints the answer, such
   as a local model through `ollama run …`
@@ -66,6 +67,9 @@ Nothing is committed, ever. The AI only edits your working tree, and only when y
   (via rust-analyzer, with a guess for other languages).
 - Per-line marks: click the gutter dot to toggle a line, drag in the gutter to select a range, then
   accept, put off for later or reset, using the keyboard or the floating bar.
+- Accept whole code items at once: a "✓ fn new", "✓ struct Store", "✓ impl …", "✓ use ×4",
+  "✓ thread_local!" button sits on each changed item's first line (also in the right-click menu), and
+  hunks inside a function offer to accept the enclosing one.
 - "Later" tab: everything you put off, lines and discussions, to come back to at the end.
 - File tree with per-file and per-folder progress. Files currently on screen are highlighted, and
   the file under your pointer is highlighted more subtly.
@@ -88,6 +92,8 @@ Nothing is committed, ever. The AI only edits your working tree, and only when y
     like a GitHub review.
   - **Ask now**: the AI answers now.
   - **Add AI to-do**: queued background work; its changes land at the end of the queue.
+- Discussions, findings and AI notes follow their code when it moves; when it is changed or removed
+  they are marked *outdated* and disappear from the code.
 - Live **AI activity** panel showing what the AI is doing (files read, edits, commands), with **Stop**.
 - **Chat** tab for questions about the change as a whole, plus a one-click **summary**: what it does,
   how, risks, and where to look closely.
@@ -109,7 +115,9 @@ Nothing is committed, ever. The AI only edits your working tree, and only when y
 - **cargo fmt**, **cargo clippy** (warnings become findings) and **cargo clippy --fix** from the Tools menu.
 
 **Code navigation and editing**
-- rust-analyzer integration: hover, ⌘-click go to definition, right-click find references. If the
+- rust-analyzer integration: hover, ⌘-click go to definition, right-click find references, and
+  **rename** (F2) across the whole project. Lines you had already accepted stay accepted (or ask for
+  another look, your choice), and lines the rename adds to the change count as your own edit. If the
   target is already on screen, the view scrolls there; otherwise the file opens in the main window.
 - Open any changed file in a built-in editor (CodeMirror). Lines you write yourself count as
   accepted, and the diff and queue update on save.
@@ -135,21 +143,48 @@ done with Claude Code. All AI texts in them are real output.
 
 ## Running
 
-Requirements: Rust, Node.js, `git`, and at least one of `claude`, `codex` or `copilot` on your PATH.
-For Rust projects, `rust-analyzer` enables code navigation.
+Requirements: Rust, Node.js (the frontend is built automatically), `git`, and at least one of `claude`,
+`codex` or `copilot` on your PATH. For Rust projects, `rust-analyzer` enables code navigation.
+
+Install:
 
 ```sh
-npm install
-npm run tauri dev
+cargo install --git https://github.com/synek317/gicio gicio
 ```
 
-or build a release bundle with `npm run tauri build`.
+Then run it inside the repository you want to review:
+
+```sh
+gicio                          # this repository, start screen prefilled
+gicio ~/code/app --since main  # everything since main in another repository
+gicio --start                  # skip the start screen, review uncommitted changes right away
+```
+
+Tick "Remember these choices" on the start screen and `gicio` opens the review straight away from
+then on. Everything the start screen asks (what to review, staging, order, AI) can be changed during a
+review from the **Start over ▾** menu, and the defaults in Settings → Preferences.
+
+Or run it from a clone:
+
+```sh
+cargo run --release
+```
+
+or install your local checkout with `cargo install-local` (an alias for
+`cargo install --path src-tauri --locked --force`).
+
+For working on gicio itself, `npm install && npm run tauri dev` gives hot reload, and
+`npm run tauri build` makes a macOS app bundle.
 
 If a CLI is not found (apps started from Finder get a minimal PATH), point gicio at it with
 `GICIO_CLAUDE_BIN`, `GICIO_CODEX_BIN`, `GICIO_COPILOT_BIN` or `GICIO_RUST_ANALYZER_BIN`.
 
-Review state lives in `.git/gicio/review-<base>.json` inside the reviewed repository, so you can close
-the app and continue later. App settings live in the app's config directory.
+Review state lives in `.git/gicio/` inside the reviewed repository, one review per scope (uncommitted
+changes, or everything since a ref), so you can close the app and continue later, also after commits
+or small edits in between: the plan, your marks on unchanged lines and the discussions carry over, and
+gicio tells you what moved. If the change is completely different (say you threw it away and started
+over), you get a fresh review and the old one is archived next to it. While gicio runs, edits made
+outside it (your editor, another agent) are picked up automatically. App settings live in the app's config directory.
 
 ## License
 

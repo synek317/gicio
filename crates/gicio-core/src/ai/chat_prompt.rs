@@ -27,7 +27,7 @@ pub fn build_chat_prompt(s: &Session, extra: &ExtraInstructions, allow_edits: bo
         "\nReply to the reviewer's latest message. If they ask for a change, edit files in the working tree (focused, \
          nothing unrelated; never commit or change git state) and end with one line saying what you changed.\n"
     } else {
-        "\nReply to the reviewer's latest message. Do NOT modify any files.\n"
+        "\nReply to the reviewer's latest message. You CANNOT modify files in this conversation (editing is turned off). If the reviewer asks for a change, do not say you will do it: say in one sentence that editing is off here and they can tick \"AI may edit code\" or start an \"AI task\"; you may describe the change briefly.\n"
     });
     out.push_str(STYLE);
     out

@@ -10,6 +10,10 @@
   import CodeText from './CodeText.svelte';
   import Gutter from './Gutter.svelte';
   import FindingCard from './FindingCard.svelte';
+  import { itemStarts } from '../item-keys';
+  import { itemLabel } from '../items';
+  import { markKeys } from '../actions';
+  import { previewOff, previewOn } from '../preview';
 
   let { cell, path, oldNo = null, newNo = null, unified = false }: { cell: Cell | null; path: string; oldNo?: number | null; newNo?: number | null; unified?: boolean } = $props();
 
@@ -18,6 +22,16 @@
   const threads = $derived(cell ? (app.threadLines.get(`${path}|${cell.side}|${cell.no}`) ?? []) : []);
   const notes = $derived(cell ? (app.noteLines.get(`${path}|${cell.side}|${cell.no}`) ?? []) : []);
   let showNotes = $state(settings.value.prefs.notesExpanded);
+  /** Items (fn, struct, use group…) starting on this line, with their unaccepted changed lines. */
+  const startsHere = $derived.by(() => {
+    if (!cell) return [];
+    const t = texts.entries[path]?.texts;
+    const file = app.files.get(path);
+    if (!t || t.binary || !file) return [];
+    return (itemStarts(file, t).get(`${cell.side}|${cell.no}`) ?? [])
+      .map((it) => ({ ...it, open: it.keys.filter((k) => app.marks.get(k) !== 'accepted') }))
+      .filter((it) => it.open.length);
+  });
   const findings = $derived(cell ? (app.findingLines.get(`${path}|${cell.side}|${cell.no}`) ?? []) : []);
   // A finding box is shown once, on its first line.
   const findingsHere = $derived(findings.filter((f) => f.line === cell?.no));
@@ -34,6 +48,7 @@
   <div
     class="line {cell.kind} {status ?? ''}"
     class:has-finding={findings.length > 0}
+    class:preview={!!cell.key && app.preview.has(cell.key)}
     class:selected
     data-line="{path}|{cell.side}|{cell.no}"
   >
@@ -54,7 +69,13 @@
       onmouseleave={leaveCode}
       onclick={click}
       oncontextmenu={(e) => openMenu(e, path, cell.side, cell.no)}
-    ><CodeText tokens={texts.tokens(path, cell.side, cell.no)} text={cell.text} hl={cell.hl} /></code>
+    ><CodeText tokens={texts.tokens(path, cell.side, cell.no)} text={cell.text} hl={cell.hl} />{#each startsHere as it}<button
+          class="item-chip inline"
+          onclick={(e) => { e.stopPropagation(); markKeys(it.open, 'accepted', false); }}
+          onmouseenter={() => previewOn(it.open)}
+          onmouseleave={previewOff}
+          title="Accept all {it.open.length} unaccepted changed line(s) of {itemLabel(it.item)}, lines {it.item.start}–{it.item.end}"
+        >✓ {itemLabel(it.item)}</button>{/each}</code>
     {#if showNotes && (notes.length || findingsHere.length)}
       <div class="note-box md">
         {#each findingsHere as f (f.id)}<FindingCard finding={f} compact />{/each}

@@ -14,6 +14,11 @@
   const threads = $derived(app.snap?.threads.filter((t) => t.chunk === c.id && t.status === 'open').length ?? 0);
   const active = $derived(app.view?.kind === 'chunk' && app.view.id === c.id);
 
+  let item: HTMLElement | undefined = $state();
+  $effect(() => {
+    if (active) item?.scrollIntoView({ block: 'nearest' });
+  });
+
   function unaccept(e: MouseEvent) {
     e.stopPropagation();
     const keys = app.chunkHunks(c).flatMap(changedKeys).filter((k) => app.marks.get(k) === 'accepted');
@@ -21,7 +26,7 @@
   }
 </script>
 
-<li class="qrow">
+<li class="qrow" bind:this={item}>
   {#if p.accepted}
     <button class="ghost small unaccept" onclick={unaccept} title="Unaccept this whole step (its lines become pending again)">↺</button>
   {/if}
