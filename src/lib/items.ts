@@ -20,9 +20,11 @@ function code(line: string): string {
   return line.replace(/\/\/.*$/, '').replace(/"(\\.|[^"\\])*"/g, '""').replace(/'(\\.|[^'\\])'/g, "''");
 }
 
-/** Line where the bracket group opened at/after `from` closes; `;` before any `{` ends a short item. */
+/** Line where the bracket group opened at/after `from` closes; `;` before any `{` ends a short item,
+ *  unless it sits inside `(…)` or `[…]` (as in `-> [u8; 4]`). */
 function blockEnd(lines: string[], from: number, open = '{', close = '}', stopAtSemicolon = true): number {
   let depth = 0;
+  let nested = 0;
   let opened = false;
   for (let i = from; i < lines.length && i < from + 5000; i++) {
     for (const ch of code(lines[i])) {
@@ -32,7 +34,9 @@ function blockEnd(lines: string[], from: number, open = '{', close = '}', stopAt
       } else if (ch === close) {
         depth--;
         if (opened && depth === 0) return i;
-      } else if (ch === ';' && !opened && depth === 0 && stopAtSemicolon) return i;
+      } else if (ch === '(' || ch === '[') nested++;
+      else if (ch === ')' || ch === ']') nested--;
+      else if (ch === ';' && !opened && depth === 0 && nested === 0 && stopAtSemicolon) return i;
     }
   }
   return from;

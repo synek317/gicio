@@ -2,13 +2,13 @@
   import { go, markKeys } from '../actions';
   import { changedKeys } from '../keys';
   import { hunksProgress, progressState } from '../progress';
+  import { progressIcons, progressTooltip } from '../progress-icon';
   import { app } from '../state.svelte';
   import type { TreeNode } from '../tree';
   import Self from './FileTreeNode.svelte';
 
   let { node, depth }: { node: TreeNode; depth: number } = $props();
 
-  const icons = { todo: '○', started: '◐', deferred: '⏸', done: '✓' };
   let open = $state(true);
   let row: HTMLElement | undefined = $state();
   const hunks = $derived(node.files.flatMap((f) => f.hunks));
@@ -34,7 +34,7 @@
   <div class="trow" bind:this={row} class:active class:onscreen={onScreen} class:hovered style="padding-left:{depth * 12 + 4}px">
     {#if file}
       <button class="tname" onclick={() => go({ kind: 'file', path: file.path })} title={file.path}>
-        <span class="qicon">{icons[st]}</span>
+        <span class="qicon" title={progressTooltip(st, p)}>{progressIcons[st]}</span>
         <span class="status s-{file.status}">{file.status[0].toUpperCase()}</span>
         <span class="tlabel">{node.name}</span>
       </button>
