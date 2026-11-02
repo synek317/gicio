@@ -3,6 +3,7 @@
   import { currentChunkId } from '../actions';
   import { api } from '../api';
   import { settings } from '../app-settings.svelte';
+  import { lspName } from '../lsp';
   import { app } from '../state.svelte';
 
   const r = $derived(app.rename!);
@@ -55,7 +56,7 @@
 <div class="modal-bg" onclick={close}>
   <div class="modal rename-dialog" onclick={(e) => e.stopPropagation()}>
     <h2>Rename{#if original} <code>{original}</code>{/if}</h2>
-    <p class="muted small">Everywhere in the project (rust-analyzer). Files are changed on disk; lines the rename adds to the change count as your own edit.</p>
+    <p class="muted small">Everywhere in the project ({lspName()}). Files are changed on disk; lines the rename adds to the change count as your own edit.</p>
     <input bind:this={input} bind:value={name} onkeydown={(e) => e.key === 'Enter' && rename()} spellcheck="false" disabled={!original || busy} />
     {#if ask}
       <fieldset>

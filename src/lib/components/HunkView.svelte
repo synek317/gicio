@@ -91,7 +91,7 @@
       <button onmouseenter={() => previewOn(keys)} onmouseleave={previewOff} onclick={(e) => { e.stopPropagation(); focusHunk(hunk.id); markKeys(keys, 'accepted'); }}>Accept hunk</button>
       <button onclick={(e) => { e.stopPropagation(); markKeys(keys, 'deferred'); }}>Later</button>
     {/if}
-    {#if space.before + space.after > 0}<button class="ghost" onclick={wholeFunction} title="Show the whole enclosing function (rust-analyzer, or a guess for other languages)">⤢ Function</button>{/if}
+    {#if space.before + space.after > 0}<button class="ghost" onclick={wholeFunction} title="Show the whole enclosing function (language server, or a guess for other languages)">⤢ Function</button>{/if}
     {#if editing}
       <button class="ghost close-editor" onclick={(e) => { e.stopPropagation(); closeEditor(); }} title="Close the editor (Esc); asks before discarding changes">✕</button>
     {:else if status !== 'deleted'}

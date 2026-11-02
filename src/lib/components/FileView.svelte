@@ -2,7 +2,7 @@
   import { basicSetup } from 'codemirror';
   import { EditorState } from '@codemirror/state';
   import { EditorView, keymap } from '@codemirror/view';
-  import { rust } from '@codemirror/lang-rust';
+  import { languageFor } from '../cm-language';
   import { oneDark } from '@codemirror/theme-one-dark';
   import { currentChunkId } from '../actions';
   import { api } from '../api';
@@ -51,7 +51,7 @@
             doc: text,
             extensions: [
               basicSetup,
-              ...(absPath.endsWith('.rs') ? [rust()] : []),
+              ...languageFor(absPath),
               ...(dark ? [oneDark] : []),
               EditorState.readOnly.of(!path),
               keymap.of([{ key: 'Mod-s', preventDefault: true, run: () => (save(), true) }]),

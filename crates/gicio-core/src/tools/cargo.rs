@@ -1,29 +1,18 @@
-use crate::ai::login_path;
+use super::tail::tail;
+use super::ToolDiagnostic;
+use crate::ai::{login_path, resolve_program};
 use crate::domain::{FilePath, RepoRoot};
 use crate::process::async_command;
 use anyhow::{bail, Context, Result};
 use serde_json::Value;
 use std::path::Path;
 
-pub struct ClippyDiagnostic {
-    pub path: FilePath,
-    pub line: u32,
-    pub end_line: u32,
-    pub level: String,
-    pub title: String,
-    pub detail: String,
-}
-
 async fn cargo(root: &RepoRoot, args: &[&str]) -> Result<std::process::Output> {
     if !root.path().join("Cargo.toml").exists() {
         bail!("not a Cargo project (no Cargo.toml at the repository root)");
     }
-    async_command("cargo").args(args).current_dir(root.path()).env("PATH", login_path()).output().await.context("failed to run cargo")
-}
-
-fn tail(bytes: &[u8]) -> String {
-    let s = String::from_utf8_lossy(bytes);
-    s.trim().chars().rev().take(2000).collect::<Vec<_>>().into_iter().rev().collect()
+    let cargo = resolve_program("cargo").context("cargo not found: install Rust (https://rustup.rs)")?;
+    async_command(cargo).args(args).current_dir(root.path()).env("PATH", login_path()).output().await.context("failed to run cargo")
 }
 
 pub async fn cargo_fmt(root: &RepoRoot) -> Result<()> {
@@ -43,7 +32,7 @@ pub async fn cargo_clippy_fix(root: &RepoRoot) -> Result<()> {
 }
 
 /// Clippy warnings and errors located in the repository.
-pub async fn cargo_clippy(root: &RepoRoot) -> Result<Vec<ClippyDiagnostic>> {
+pub async fn cargo_clippy(root: &RepoRoot) -> Result<Vec<ToolDiagnostic>> {
     let out = cargo(root, &["clippy", "--workspace", "--all-targets", "--message-format=json"]).await?;
     let mut found = Vec::new();
     for line in String::from_utf8_lossy(&out.stdout).lines() {
@@ -60,7 +49,7 @@ pub async fn cargo_clippy(root: &RepoRoot) -> Result<Vec<ClippyDiagnostic>> {
         let file = span["file_name"].as_str().unwrap_or_default();
         let rel = Path::new(file).strip_prefix(root.path()).map(|p| p.to_string_lossy().to_string()).unwrap_or_else(|_| file.to_string());
         let Ok(path) = FilePath::new(&rel) else { continue };
-        found.push(ClippyDiagnostic {
+        found.push(ToolDiagnostic {
             path,
             line: span["line_start"].as_u64().unwrap_or(1) as u32,
             end_line: span["line_end"].as_u64().unwrap_or(1) as u32,

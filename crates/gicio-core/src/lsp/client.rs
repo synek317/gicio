@@ -6,6 +6,7 @@ use anyhow::{anyhow, Context, Result};
 use serde::Serialize;
 use serde_json::{json, Value};
 use std::collections::HashMap;
+use std::ffi::OsString;
 use std::path::Path;
 use std::process::Stdio;
 use std::sync::atomic::{AtomicI64, Ordering};
@@ -19,6 +20,9 @@ use tokio::sync::{oneshot, Mutex};
 #[serde(tag = "state", rename_all = "camelCase")]
 pub enum LspStatus {
     Off,
+    /// The project needs a server that is not installed.
+    Missing,
+    Installing,
     Starting,
     Indexing { detail: String },
     Ready,
@@ -38,8 +42,9 @@ pub struct LspClient {
 }
 
 impl LspClient {
-    pub fn spawn(program: &Path, path_env: &str, cwd: &Path) -> Result<Self> {
+    pub fn spawn(program: &Path, args: &[OsString], path_env: &str, cwd: &Path) -> Result<Self> {
         let mut child = async_command(program)
+            .args(args)
             .env("PATH", path_env)
             .current_dir(cwd)
             .stdin(Stdio::piped())
@@ -77,6 +82,11 @@ impl LspClient {
                 Err(anyhow!("{method} timed out"))
             }
         }
+    }
+
+    /// For servers that never say when the workspace is loaded: treat it as loaded now.
+    pub fn mark_loaded(&self) {
+        self.readiness.set(true);
     }
 
     /// Waits until the server has loaded the whole workspace.
@@ -169,7 +179,7 @@ async fn reader_loop(mut reader: BufReader<tokio::process::ChildStdout>, stdin: 
 /// Indexing while the workspace is loading or any progress is running, Ready otherwise.
 fn update_status(status: &StdMutex<LspStatus>, active_progress: &HashMap<String, String>, readiness: &Readiness) {
     let mut s = status.lock().unwrap();
-    if matches!(*s, LspStatus::Failed { .. } | LspStatus::Starting) {
+    if !matches!(*s, LspStatus::Indexing { .. } | LspStatus::Ready) {
         return;
     }
     *s = match active_progress.values().next() {

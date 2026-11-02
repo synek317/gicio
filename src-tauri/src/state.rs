@@ -1,4 +1,4 @@
-use gicio_core::lsp::RustAnalyzer;
+use gicio_core::lsp::{LanguageServer, ServerKind};
 use gicio_core::review::Session;
 use std::sync::{Arc, Mutex, MutexGuard};
 
@@ -16,9 +16,12 @@ pub struct AppState {
 pub enum LspSlot {
     #[default]
     Off,
-    Starting,
-    Running(Arc<RustAnalyzer>),
-    Failed(String),
+    /// The project's server is not installed.
+    Missing(ServerKind),
+    Installing(ServerKind),
+    Starting(ServerKind),
+    Running(Arc<LanguageServer>),
+    Failed(ServerKind, String),
 }
 
 pub struct SessionGuard<'a>(MutexGuard<'a, Option<Session>>);
@@ -49,9 +52,9 @@ impl AppState {
         *self.session.lock().unwrap() = Some(s);
     }
 
-    pub fn lsp(&self) -> Option<Arc<RustAnalyzer>> {
+    pub fn lsp(&self) -> Option<Arc<LanguageServer>> {
         match &*self.lsp.lock().unwrap() {
-            LspSlot::Running(ra) => Some(ra.clone()),
+            LspSlot::Running(ls) => Some(ls.clone()),
             _ => None,
         }
     }

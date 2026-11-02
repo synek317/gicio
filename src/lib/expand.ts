@@ -1,4 +1,5 @@
 import { api } from './api';
+import { isCSharpDecl } from './items-csharp';
 import { lspUsable } from './lsp';
 import type { DiffLine, Hunk } from './types';
 
@@ -42,10 +43,12 @@ function indentOf(s: string) {
 }
 
 /** Heuristic for files without a language server: nearest declaration above, its end below. */
-function guessRange(lines: string[], start: number, end: number, python: boolean): [number, number] | null {
+function guessRange(lines: string[], start: number, end: number, path: string): [number, number] | null {
+  const python = path.endsWith('.py');
+  const isDecl = path.endsWith('.cs') ? isCSharpDecl : (l: string) => DECL.test(l);
   let from = 0;
   for (let i = start; i >= Math.max(1, start - 500); i--) {
-    if (DECL.test(lines[i - 1] ?? '')) {
+    if (isDecl(lines[i - 1] ?? '')) {
       from = i;
       break;
     }
@@ -67,5 +70,5 @@ export async function enclosingRange(path: string, start: number, end: number, l
     const best = pick(syms.filter((s) => FUNCTION_KINDS.includes(s.kind))) ?? pick(syms);
     if (best) return [best.start, best.end];
   }
-  return guessRange(lines, start, end, path.endsWith('.py'));
+  return guessRange(lines, start, end, path);
 }

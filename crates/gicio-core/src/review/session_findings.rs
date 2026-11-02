@@ -2,7 +2,7 @@ use super::{Finding, FindingId, FindingSource, FindingStatus, Session, Severity}
 use crate::ai::RawFinding;
 use crate::diff::Side;
 use crate::domain::FilePath;
-use crate::tools::ClippyDiagnostic;
+use crate::tools::ToolDiagnostic;
 use std::collections::HashSet;
 
 fn severity(s: Option<&str>) -> Severity {
@@ -51,17 +51,17 @@ impl Session {
         n
     }
 
-    /// Replaces all clippy findings; only those in changed files are kept.
-    pub fn set_clippy_findings(&mut self, diags: Vec<ClippyDiagnostic>) -> usize {
-        self.state.findings.retain(|f| f.source != FindingSource::Clippy);
+    /// Replaces all findings of a tool (clippy, dotnet build); only those in changed files are kept.
+    pub fn set_tool_findings(&mut self, source: FindingSource, diags: Vec<ToolDiagnostic>) -> usize {
+        self.state.findings.retain(|f| f.source != source);
         let mut n = 0;
-        let diags: Vec<ClippyDiagnostic> = diags.into_iter().filter(|d| self.changed(&d.path)).collect();
+        let diags: Vec<ToolDiagnostic> = diags.into_iter().filter(|d| self.changed(&d.path)).collect();
         for d in diags {
             let code = self.excerpt_of(&d.path, Side::New, d.line, d.end_line);
             let id = self.state.next_finding_id();
             self.state.findings.push(Finding {
                 id,
-                source: FindingSource::Clippy,
+                source,
                 severity: severity(Some(&d.level)),
                 path: d.path,
                 side: Side::New,

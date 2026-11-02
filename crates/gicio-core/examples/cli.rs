@@ -119,7 +119,7 @@ async fn main() -> anyhow::Result<()> {
             let keys: Vec<_> = s.files.iter().flat_map(|f| f.hunks.iter().flat_map(move |h| h.lines.iter().filter_map(move |l| l.review_pos().map(|(side, line)| gicio_core::review::LineKey { path: f.path.clone(), side, line })))).take(20).collect();
             s.set_marks(keys, Some(gicio_core::review::MarkStatus::Accepted));
             let accepted_before = Vec::<gicio_core::review::Mark>::from(s.state.marks.clone()).len();
-            let ra = gicio_core::lsp::RustAnalyzer::start(s.state.repo.clone()).await?;
+            let ra = gicio_core::lsp::LanguageServer::start(gicio_core::lsp::ServerKind::RustAnalyzer, s.state.repo.clone()).await?;
             let path = gicio_core::domain::FilePath::new(&args[3])?;
             let (line, col): (u32, u32) = (args[4].parse()?, args[5].parse()?);
             for _ in 0..90 {
@@ -208,7 +208,7 @@ async fn main() -> anyhow::Result<()> {
             println!("after reset: {} marks, {} chunks", Vec::<gicio_core::review::Mark>::from(s.state.marks.clone()).len(), s.state.chunks.len());
         }
         Some("lsp") => {
-            let ra = gicio_core::lsp::RustAnalyzer::start(s.state.repo.clone()).await?;
+            let ra = gicio_core::lsp::LanguageServer::start(gicio_core::lsp::ServerKind::RustAnalyzer, s.state.repo.clone()).await?;
             let path = gicio_core::domain::FilePath::new("src/main.rs")?;
             for _ in 0..60 {
                 tokio::time::sleep(std::time::Duration::from_secs(1)).await;

@@ -4,6 +4,7 @@
   import SettingsModal from './SettingsModal.svelte';
   import BlankLinesPrompt from './BlankLinesPrompt.svelte';
   import RenameDialog from './RenameDialog.svelte';
+  import LspPrompt from './LspPrompt.svelte';
 
   const MOUSE = [
     ['click gutter', 'select a line; shift-click range; ⌘-click toggle; drag to select'],
@@ -13,7 +14,7 @@
     ['right-click code', 'definition, references, open file, ask AI'],
     ['Esc', 'clear selection / close'],
   ];
-  import { keepHover, leaveCode } from '../lsp';
+  import { keepHover, leaveCode, lspPromptShown } from '../lsp';
   import { renderMarkdown } from '../markdown';
   import { app } from '../state.svelte';
   import ContextMenu from './ContextMenu.svelte';
@@ -52,6 +53,7 @@
 {#if settings.open}<SettingsModal />{/if}
 {#if app.blankPrompt}<BlankLinesPrompt />{/if}
 {#if app.rename}<RenameDialog />{/if}
+{#if lspPromptShown()}<LspPrompt />{/if}
 
 <div class="toasts">
   {#each app.toasts as t (t.id)}

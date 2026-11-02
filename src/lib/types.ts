@@ -39,9 +39,9 @@ export type StageMode = 'memory' | 'index';
 export interface DiffOptions { ignoreWhitespace: boolean }
 export type Severity = 'error' | 'warning' | 'info';
 export type FindingStatus = 'open' | 'fixing' | 'fixed' | 'dismissed';
-export interface Finding { id: string; source: 'ai' | 'clippy'; severity: Severity; path: string; side: Side; line: number; endLine: number; title: string; detail: string; status: FindingStatus; outdated?: boolean }
+export interface Finding { id: string; source: 'ai' | 'clippy' | 'dotnet'; severity: Severity; path: string; side: Side; line: number; endLine: number; title: string; detail: string; status: FindingStatus; outdated?: boolean }
 export type ReviewScope = { kind: 'all' } | { kind: 'chunk'; id: string } | { kind: 'lines'; path: string; side: Side; start: number; end: number };
-export type Tool = 'fmt' | 'clippy' | 'clippyFix';
+export type Tool = 'fmt' | 'clippy' | 'clippyFix' | 'dotnetFormat' | 'dotnetBuild';
 export interface Symbol { name: string; kind: number; start: number; end: number }
 
 export interface Snapshot {
@@ -70,7 +70,15 @@ export interface Snapshot {
   instructions: InstructionFile[];
 }
 
-export type LspStatus = { state: 'off' | 'starting' | 'ready' } | { state: 'indexing' | 'failed'; detail: string };
+/** How a missing language server gets installed; `available` when gicio can run the installer itself. */
+export interface LspInstall { command: string; available: boolean; prerequisite: string }
+/** The language server's state, which server it is (rust-analyzer, csharp-ls), the file extensions it
+ *  understands and, when it is missing, how to install it. */
+export type LspStatus = ({ state: 'off' | 'missing' | 'installing' | 'starting' | 'ready' } | { state: 'indexing' | 'failed'; detail: string }) & {
+  server: string | null;
+  extensions: string[];
+  install: LspInstall | null;
+};
 export interface SourceLocation { absPath: string; repoPath: string | null; line: number; character: number; preview: string | null }
 export interface LaunchArgs { repo: string | null; since: string | null; start: boolean; warning: string | null }
 export interface FileTexts { old: string; new: string; binary: boolean }

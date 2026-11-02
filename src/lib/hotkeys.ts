@@ -21,7 +21,7 @@ const handlers: Record<ActionId, () => void> = {
   comment: () => openComposer(),
   rename: () => {
     if (app.pointerCode) app.rename = { ...app.pointerCode };
-    else app.toast('Point at a symbol (rust-analyzer running) and press F2, or right-click it.');
+    else app.toast('Point at a symbol (language server running) and press F2, or right-click it.');
   },
   edit: () => editFocused(),
   toggleLayout: () => (app.layout = app.layout === 'split' ? 'unified' : 'split'),

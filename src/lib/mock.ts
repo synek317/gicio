@@ -1,12 +1,17 @@
 // Browser-only stand-in for the Tauri backend, so the UI can be developed with `npm run dev`.
 // Loads a snapshot dumped by `cargo run -p gicio-core --example cli -- <repo> <base> dump static/dev-fixture.json`.
 import { keyOf } from './keys';
-import type { FileTexts, JobInfo, LineKey, Mark, MarkStatus, Snapshot } from './types';
+import type { FileTexts, JobInfo, LineKey, LspStatus, Mark, MarkStatus, Snapshot } from './types';
 
 interface Fixture { snapshot: Snapshot; texts: Record<string, FileTexts>; jobs?: JobInfo[] }
 
 let fixture: Fixture | null = null;
 let undo: Mark[][] = [];
+/** `?lsp=missing` (or `?lsp=noinstaller`) shows the prompt for a missing csharp-ls. */
+const lspParam = typeof location === 'undefined' ? null : new URLSearchParams(location.search).get('lsp');
+let mockLsp: LspStatus = lspParam
+  ? { state: 'missing', server: 'csharp-ls', extensions: ['cs'], install: { command: 'dotnet tool update --global csharp-ls', available: lspParam !== 'noinstaller', prerequisite: 'the .NET SDK (https://dot.net)' } }
+  : { state: 'off', server: null, extensions: [], install: null };
 
 async function load(): Promise<Fixture> {
   fixture ??= await (await fetch('/dev-fixture.json')).json();
@@ -158,7 +163,15 @@ export async function mockInvoke(cmd: string, args: Record<string, any> = {}): P
       s.backend = args.backend;
       return bump();
     case 'lsp_status':
-      return { state: 'off' };
+      return mockLsp;
+    case 'lsp_install':
+      mockLsp = { ...mockLsp, state: 'installing', install: null };
+      await new Promise((r) => setTimeout(r, 1500));
+      mockLsp = { ...mockLsp, state: 'ready' };
+      return null;
+    case 'lsp_restart':
+      mockLsp = { ...mockLsp, state: 'ready', install: null };
+      return null;
     case 'reset_review':
       s.marks = [];
       s.threads = [];

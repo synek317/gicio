@@ -17,7 +17,7 @@ export async function runTool(tool: Tool) {
   try {
     const msg = await api.runTool(tool);
     app.toast(msg);
-    if (tool === 'clippy') app.rightTab = 'findings';
+    if (tool === 'clippy' || tool === 'dotnetBuild') app.rightTab = 'findings';
   } catch (e) {
     app.toast(String(e), 'error');
   }

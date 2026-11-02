@@ -4,7 +4,7 @@
   import { EditorState } from '@codemirror/state';
   import { EditorView, highlightActiveLine, keymap, lineNumbers } from '@codemirror/view';
   import { unifiedMergeView } from '@codemirror/merge';
-  import { rust } from '@codemirror/lang-rust';
+  import { languageFor } from '../cm-language';
   import { oneDark } from '@codemirror/theme-one-dark';
   import { currentChunkId } from '../actions';
   import { api } from '../api';
@@ -90,7 +90,7 @@
               // Like the diff view: whole added and removed lines, no character-level marks.
               unifiedMergeView({ original, mergeControls: false, gutter: false, highlightChanges: false }),
               EditorView.lineWrapping,
-              ...(path.endsWith('.rs') ? [rust()] : []),
+              ...languageFor(path),
               ...(dark ? [oneDark] : []),
               keymap.of([
                 { key: 'Mod-s', preventDefault: true, run: () => (save(), true) },

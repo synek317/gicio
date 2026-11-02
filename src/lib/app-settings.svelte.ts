@@ -15,6 +15,8 @@ export interface Prefs {
   blankLines: 'ask' | 'accept' | 'never';
   /** After a rename, lines that were already accepted. */
   renameAccepted: 'ask' | 'keep' | 'review';
+  /** Offer to install the project's language server when it is missing. */
+  offerLspInstall: boolean;
 }
 
 export interface AppSettings {
@@ -47,7 +49,7 @@ export function defaultSettings(): AppSettings {
     skipPatterns: [...DEFAULT_SKIP],
     start: defaultStartOptions(),
     skipStartScreen: false,
-    prefs: { layout: 'split', autoAdvance: true, notesExpanded: false, confirmStartOver: true, hoverDelayMs: 450, blankLines: 'ask', renameAccepted: 'ask' },
+    prefs: { layout: 'split', autoAdvance: true, notesExpanded: false, confirmStartOver: true, hoverDelayMs: 450, blankLines: 'ask', renameAccepted: 'ask', offerLspInstall: true },
     keybindings: defaultKeybindings(),
   };
 }

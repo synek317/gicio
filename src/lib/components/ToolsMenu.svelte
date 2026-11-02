@@ -1,9 +1,11 @@
 <script lang="ts">
+  import { touchesCSharp, touchesRust } from '../project-tools';
   import { exportReview, runTool } from '../review-actions';
   import { app } from '../state.svelte';
 
   let open = $state(false);
-  const rust = $derived(app.snap!.files.some((f) => f.path.endsWith('.rs') || f.path === 'Cargo.toml'));
+  const rust = $derived(touchesRust(app.snap!.files));
+  const csharp = $derived(touchesCSharp(app.snap!.files));
 
   function act(f: () => void) {
     open = false;
@@ -20,6 +22,9 @@
       <button disabled={!rust} onclick={() => act(() => runTool('fmt'))}>cargo fmt</button>
       <button disabled={!rust} onclick={() => act(() => runTool('clippy'))}>cargo clippy → findings</button>
       <button disabled={!rust} onclick={() => act(() => runTool('clippyFix'))}>cargo clippy --fix</button>
+      <hr />
+      <button disabled={!csharp} onclick={() => act(() => runTool('dotnetFormat'))}>dotnet format</button>
+      <button disabled={!csharp} onclick={() => act(() => runTool('dotnetBuild'))}>dotnet build → findings</button>
       <hr />
       <button onclick={() => act(exportReview)}>Export review as markdown…</button>
     </div>

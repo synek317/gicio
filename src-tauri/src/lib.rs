@@ -71,6 +71,8 @@ pub fn run() {
             commands::changes::accept_change,
             commands::changes::reject_change,
             commands::lsp::lsp_status,
+            commands::lsp::lsp_install,
+            commands::lsp::lsp_restart,
             commands::lsp::lsp_hover,
             commands::lsp::lsp_definition,
             commands::lsp::lsp_references,

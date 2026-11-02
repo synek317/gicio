@@ -5,7 +5,7 @@
   import { previewOff, previewOn } from '../preview';
   import { texts } from '../texts.svelte';
   import { keyOf } from '../keys';
-  import { findReferences, gotoDefinition, lspUsable } from '../lsp';
+  import { findReferences, gotoDefinition, lspHandles, lspName, lspUsable } from '../lsp';
   import { app } from '../state.svelte';
   import { reviewWithAi } from '../review-actions';
 
@@ -63,6 +63,12 @@
       <button onclick={() => act(ask)}>New conversation… <kbd>c</kbd></button>
       <button onclick={() => act(reviewHere)}>AI review {selected ? 'the selection' : 'this line'}</button>
     {/if}
-    {#if !lsp && m.side === 'new' && m.path.endsWith('.rs')}<div class="muted small menu-note">rust-analyzer: {app.lsp.state}</div>{/if}
+    {#if !lsp && m.side === 'new' && lspHandles(m.path)}
+      {#if app.lsp.state === 'missing' || app.lsp.state === 'failed'}
+        <button onclick={() => act(() => (app.lspPrompt = 'open'))}>{lspName()} {app.lsp.state === 'missing' ? 'is not installed' : 'failed'}…</button>
+      {:else}
+        <div class="muted small menu-note">{lspName()}: {app.lsp.state}</div>
+      {/if}
+    {/if}
   </div>
 </div>

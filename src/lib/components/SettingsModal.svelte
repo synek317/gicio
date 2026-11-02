@@ -75,7 +75,8 @@
           </label>
           <label class="toggle"><input type="checkbox" bind:checked={draft.prefs.notesExpanded} /> Show AI notes (?) expanded</label>
           <label class="toggle"><input type="checkbox" bind:checked={draft.prefs.confirmStartOver} /> Ask before “Start over”</label>
-          <label>rust-analyzer hover delay (ms)
+          <label class="toggle"><input type="checkbox" bind:checked={draft.prefs.offerLspInstall} /> Offer to install a missing language server (rust-analyzer, csharp-ls)</label>
+          <label>Language server hover delay (ms)
             <input type="number" min="100" max="3000" step="50" bind:value={draft.prefs.hoverDelayMs} />
           </label>
         </div>

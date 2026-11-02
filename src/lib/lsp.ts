@@ -8,7 +8,19 @@ import type { SourceLocation } from './types';
 let timer: ReturnType<typeof setTimeout> | undefined;
 let hideTimer: ReturnType<typeof setTimeout> | undefined;
 
-export const lspUsable = (path: string) => path.endsWith('.rs') && (app.lsp.state === 'ready' || app.lsp.state === 'indexing');
+/** How the UI names the project's language server, e.g. "rust-analyzer". */
+export const lspName = () => app.lsp.server ?? 'language server';
+
+/** Whether the project's language server (running or not) understands this file. */
+export const lspHandles = (path: string) => app.lsp.extensions.includes(path.split('.').pop()?.toLowerCase() ?? '');
+
+/** Whether to show the prompt about a missing (or, when asked for, failed) language server. */
+export function lspPromptShown(): boolean {
+  if (app.lspPrompt === 'open') return app.lsp.state === 'missing' || app.lsp.state === 'failed';
+  return app.lspPrompt === 'auto' && app.lsp.state === 'missing' && settings.value.prefs.offerLspInstall;
+}
+
+export const lspUsable = (path: string) => lspHandles(path) && (app.lsp.state === 'ready' || app.lsp.state === 'indexing');
 
 /** UTF-16 column under the pointer inside a rendered code line (tokens carry `data-col`). */
 export function columnAt(x: number, y: number): number | null {
@@ -74,7 +86,7 @@ export async function gotoDefinition(path: string, line: number, col: number) {
 
 export async function findReferences(path: string, line: number, col: number) {
   app.hover = null;
-  if (app.lsp.state === 'indexing') app.toast('Waiting for rust-analyzer to load the whole project…');
+  if (app.lsp.state === 'indexing') app.toast(`Waiting for ${lspName()} to load the whole project…`);
   try {
     const locs = await api.lspReferences(path, line - 1, col);
     if (!locs.length) return app.toast('No references found');

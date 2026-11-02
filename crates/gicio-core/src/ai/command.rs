@@ -9,7 +9,8 @@ use tokio::process::Command;
 const CLAUDE_READ_TOOLS: &[&str] = &["Read", "Grep", "Glob", "LS", "Skill"];
 const CLAUDE_EDIT_TOOLS: &[&str] = &[
     "Read", "Grep", "Glob", "LS", "Skill", "Edit", "MultiEdit", "Write",
-    "Bash(cargo check:*)", "Bash(cargo build:*)", "Bash(cargo test:*)", "Bash(cargo clippy:*)", "Bash(git diff:*)", "Bash(git status:*)",
+    "Bash(cargo check:*)", "Bash(cargo build:*)", "Bash(cargo test:*)", "Bash(cargo clippy:*)",
+    "Bash(dotnet build:*)", "Bash(dotnet test:*)", "Bash(git diff:*)", "Bash(git status:*)",
 ];
 
 /// How a CLI reports its result.

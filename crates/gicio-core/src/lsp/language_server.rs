@@ -1,5 +1,6 @@
+use super::identifier::identifier_at;
 use super::uri::{from_uri, to_uri};
-use super::{LspClient, LspStatus};
+use super::{LspClient, LspStatus, ServerKind};
 use crate::ai::{login_path, resolve_program};
 use crate::domain::{FilePath, RepoRoot};
 use anyhow::{Context, Result};
@@ -37,16 +38,21 @@ pub struct Symbol {
     pub end: u32,
 }
 
-pub struct RustAnalyzer {
+/// A running language server (rust-analyzer, csharp-ls) for one repository.
+pub struct LanguageServer {
+    kind: ServerKind,
     client: LspClient,
     root: RepoRoot,
     open_docs: Mutex<HashMap<String, (i32, String)>>,
+    /// Whether the server answers `textDocument/prepareRename`.
+    prepare_rename: bool,
 }
 
-impl RustAnalyzer {
-    pub async fn start(root: RepoRoot) -> Result<Self> {
-        let program = resolve_program("rust-analyzer").context("rust-analyzer not found (rustup component add rust-analyzer)")?;
-        let client = LspClient::spawn(&program, login_path(), root.path())?;
+impl LanguageServer {
+    pub async fn start(kind: ServerKind, root: RepoRoot) -> Result<Self> {
+        let name = kind.name();
+        let program = resolve_program(name).with_context(|| format!("{name} not found ({})", kind.install_command()))?;
+        let client = LspClient::spawn(&program, &kind.args(&root), login_path(), root.path())?;
         let params = json!({
             "processId": std::process::id(),
             "rootUri": to_uri(root.path()),
@@ -64,12 +70,22 @@ impl RustAnalyzer {
                 "experimental": {"serverStatusNotification": true},
                 "workspace": {"workspaceEdit": {"documentChanges": true, "resourceOperations": ["rename"]}}
             },
-            "initializationOptions": {"checkOnSave": false, "cachePriming": {"enable": true}}
+            "initializationOptions": kind.initialization_options()
         });
-        client.request("initialize", params, Duration::from_secs(60)).await?;
+        let init = client.request("initialize", params, Duration::from_secs(60)).await?;
+        let prepare_rename = init.pointer("/capabilities/renameProvider/prepareProvider").and_then(Value::as_bool).unwrap_or(false);
         client.notify("initialized", json!({})).await?;
-        client.set_status(LspStatus::Indexing { detail: "loading workspace".into() });
-        Ok(Self { client, root, open_docs: Mutex::new(HashMap::new()) })
+        if kind.reports_quiescence() {
+            client.set_status(LspStatus::Indexing { detail: "loading workspace".into() });
+        } else {
+            client.mark_loaded();
+            client.set_status(LspStatus::Ready);
+        }
+        Ok(Self { kind, client, root, open_docs: Mutex::new(HashMap::new()), prepare_rename })
+    }
+
+    pub fn kind(&self) -> ServerKind {
+        self.kind
     }
 
     pub fn status(&self) -> LspStatus {
@@ -84,7 +100,7 @@ impl RustAnalyzer {
         let mut docs = self.open_docs.lock().await;
         match docs.get_mut(&uri) {
             None => {
-                self.client.notify("textDocument/didOpen", json!({"textDocument": {"uri": uri, "languageId": "rust", "version": 1, "text": text}})).await?;
+                self.client.notify("textDocument/didOpen", json!({"textDocument": {"uri": uri, "languageId": self.kind.language_id(), "version": 1, "text": text}})).await?;
                 docs.insert(uri.clone(), (1, text));
             }
             Some((version, old)) if *old != text => {
@@ -132,6 +148,10 @@ impl RustAnalyzer {
 
     /// The name a rename at this position would change, or `None` if nothing renamable is there.
     pub async fn prepare_rename(&self, path: &FilePath, line: u32, character: u32) -> Result<Option<String>> {
+        if !self.prepare_rename {
+            let text = std::fs::read_to_string(self.root.join(path))?;
+            return Ok(text.lines().nth(line as usize).and_then(|l| identifier_at(l, character)));
+        }
         let uri = self.sync(path).await?;
         let res = self.client.request("textDocument/prepareRename", Self::position(&uri, line, character), REQUEST_TIMEOUT).await?;
         if res.is_null() {

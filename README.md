@@ -69,12 +69,13 @@ Nothing is committed, ever. The AI only edits your working tree, and only when y
 - Side-by-side or unified diff (added and deleted files are always unified), with syntax highlighting
   and word-level highlights of what changed inside a line. Whitespace-only changes can be ignored.
 - More context on demand: 20 more lines above or below a hunk, or the whole enclosing function
-  (via rust-analyzer, with a guess for other languages).
+  (via rust-analyzer or csharp-ls, with a guess for other languages).
 - Per-line marks: click the gutter dot to toggle a line, or the bar at the left of a block of changed
   lines to accept the whole block. Drag in the gutter to select a range, then put it off for later,
   reset it or start a conversation about it (keyboard or the floating bar).
 - Accept whole code items at once: a "✓ fn new", "✓ struct Store", "✓ impl …", "✓ use ×4",
-  "✓ thread_local!" button sits on each changed item's first line (also in the right-click menu), and
+  "✓ thread_local!" (in C#: "✓ class Order", "✓ method GetAsync", "✓ property Name", "✓ using ×3")
+  button sits on each changed item's first line (also in the right-click menu), and
   hunks inside a function offer to accept the enclosing one.
 - "Resolve issues left for later": the last step gathers everything you put off, lines and
   conversations, to come back to at the end.
@@ -102,11 +103,11 @@ Nothing is committed, ever. The AI only edits your working tree, and only when y
     AI as one task (like submitting a GitHub review), or you resolve them yourself.
 - Conversations, findings and AI notes follow their code when it moves; when it is changed or removed
   they are marked *outdated* and disappear from the code.
-- **AI changes** on their own: every AI job that edits code (and `cargo fmt` / `clippy --fix`) is
-  recorded as a snapshot of the working tree before and after it. "Show changes" under its note, or
-  the "AI changes to check" list above the steps, shows only what that job changed. **Accept** keeps it
-  and counts the lines it wrote as reviewed; **Reject** puts its files back as they were before it
-  (files you edited again since are left alone).
+- **AI changes** on their own: every AI job that edits code (and `cargo fmt` / `clippy --fix` /
+  `dotnet format`) is recorded as a snapshot of the working tree before and after it. "Show changes"
+  under its note, or the "AI changes to check" list above the steps, shows only what that job changed.
+  **Accept** keeps it and counts the lines it wrote as reviewed; **Reject** puts its files back as they
+  were before it (files you edited again since are left alone).
 - Live **AI activity** panel showing what the AI is doing (files read, edits, commands), with **Stop**.
 - A **Whole change** conversation for questions about the change as a whole, with a one-click
   **summary**: what it does, how, risks, and where to look closely.
@@ -127,12 +128,15 @@ Nothing is committed, ever. The AI only edits your working tree, and only when y
   out of AI planning, reviews and summaries by default; the patterns are configurable in Settings.
 - **cargo fmt**, **cargo clippy** (whole workspace, all targets; warnings become findings) and
   **cargo clippy --fix** from the Tools menu.
+- For C#: **dotnet format** and **dotnet build** (a full rebuild of the solution; compiler and
+  analyzer warnings become findings) from the Tools menu.
 
 **Code navigation and editing**
-- rust-analyzer integration: hover, ⌘-click go to definition, right-click find references, and
-  **rename** (F2) across the whole project. Lines you had already accepted stay accepted (or ask for
-  another look, your choice), and lines the rename adds to the change count as your own edit. If the
-  target is already on screen, the view scrolls there; otherwise the file opens in the main window.
+- Language server integration (rust-analyzer for Cargo projects, csharp-ls for .NET ones): hover,
+  ⌘-click go to definition, right-click find references, and **rename** (F2) across the whole
+  project. Lines you had already accepted stay accepted (or ask for another look, your choice), and
+  lines the rename adds to the change count as your own edit. If the target is already on screen, the
+  view scrolls there; otherwise the file opens in the main window.
 - Edit code **in place**: "✎ Edit" (or `e`) turns a hunk into an editor right in the diff. "Open file"
   shows the whole file in the built-in editor (CodeMirror). Lines you write yourself count as accepted,
   and the diff and steps update on save.
@@ -163,7 +167,10 @@ done with Claude Code. All AI texts in them are real output.
 
 gicio runs on macOS (Apple silicon), Linux and Windows. Whichever way you install it, it needs `git`
 and at least one of `claude`, `codex` or `copilot` (or your own command, see [Running](#running)).
-For Rust projects, `rust-analyzer` enables code navigation.
+For Rust projects, `rust-analyzer` enables code navigation; for C# projects (a `.sln`, `.slnx` or
+`.csproj` up to three directories deep), `csharp-ls` does. When the project's server is missing, gicio
+offers to install it (`rustup component add rust-analyzer`, `dotnet tool update --global csharp-ls`);
+without it everything but code navigation works.
 
 Ready-made builds are on the [Releases](https://github.com/synek317/gicio/releases) page.
 
@@ -252,7 +259,7 @@ or `.msi`/setup `.exe`).
 
 A custom AI command runs through `/bin/sh` (on Windows, `cmd.exe`). If a CLI is not found (apps
 started from Finder or the Start menu get a minimal PATH), point gicio at it with `GICIO_CLAUDE_BIN`,
-`GICIO_CODEX_BIN`, `GICIO_COPILOT_BIN` or `GICIO_RUST_ANALYZER_BIN`.
+`GICIO_CODEX_BIN`, `GICIO_COPILOT_BIN`, `GICIO_RUST_ANALYZER_BIN` or `GICIO_CSHARP_LS_BIN`.
 
 ### Releasing
 

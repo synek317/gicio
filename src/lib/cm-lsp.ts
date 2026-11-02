@@ -7,7 +7,7 @@ import { openMenu } from './menu';
 import { app } from './state.svelte';
 import { settings } from './app-settings.svelte';
 
-/** rust-analyzer in CodeMirror: hover, ⌘-click definition, right-click menu. */
+/** The language server in CodeMirror: hover, ⌘-click definition, right-click menu. */
 export function lspExtensions(path: string): Extension[] {
   const pos = (view: EditorView, p: number) => {
     const line = view.state.doc.lineAt(p);

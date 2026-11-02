@@ -24,6 +24,7 @@ impl fmt::Display for FindingId {
 pub enum FindingSource {
     Ai,
     Clippy,
+    Dotnet,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]

@@ -28,7 +28,7 @@
   {/if}
   {#if f.detail}
     {#if compact || open}
-      <div class="md fdetail" class:mono-detail={f.source === 'clippy'}>{#if f.source === 'clippy'}<pre>{f.detail}</pre>{:else}{@html renderMarkdown(f.detail)}{/if}</div>
+      <div class="md fdetail" class:mono-detail={f.source !== 'ai'}>{#if f.source !== 'ai'}<pre>{f.detail}</pre>{:else}{@html renderMarkdown(f.detail)}{/if}</div>
     {:else}
       <button class="link small" onclick={() => (open = true)}>details</button>
     {/if}

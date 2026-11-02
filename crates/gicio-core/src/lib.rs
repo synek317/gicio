@@ -4,6 +4,7 @@ pub mod domain;
 pub mod git;
 pub mod lsp;
 pub mod process;
+pub mod project;
 pub mod review;
 pub mod skip;
 pub mod stage;

@@ -2,7 +2,7 @@
 name = "gicio-core"
 version = "0.1.0"
 edition = "2024"
-description = "Core of gicio: diff, review state, AI CLI runners, rust-analyzer client"
+description = "Core of gicio: diff, review state, AI CLI runners, language server client"
 authors = ["Marcin Sas-Szymański <synek317@gmail.com>"]
 license = "PolyForm-Noncommercial-1.0.0"
 

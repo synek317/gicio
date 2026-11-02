@@ -226,7 +226,7 @@ export function currentChunkId(): string | null {
   return null;
 }
 
-/** Opens a repo file in the main window (editable, with rust-analyzer). */
+/** Opens a repo file in the main window (editable, with the language server). */
 export function editFile(path: string, line: number | null = null) {
   go({ kind: 'source', title: path, absPath: `${app.snap!.repo}/${path}`, repoPath: path, line });
 }

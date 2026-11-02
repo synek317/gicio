@@ -26,7 +26,7 @@ impl Readiness {
         let mut rx = self.0.subscribe();
         match tokio::time::timeout(timeout, rx.wait_for(|loaded| *loaded)).await {
             Ok(_) => Ok(()),
-            Err(_) => Err(anyhow!("rust-analyzer is still loading the project, try again in a moment")),
+            Err(_) => Err(anyhow!("the language server is still loading the project, try again in a moment")),
         }
     }
 }

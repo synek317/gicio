@@ -44,7 +44,10 @@ class AppState {
   sidebarTab = $state<'steps' | 'files'>('steps');
   rightTab = $state<'conversations' | 'findings'>('conversations');
   showHelp = $state(false);
-  lsp = $state<LspStatus>({ state: 'off' });
+  lsp = $state<LspStatus>({ state: 'off', server: null, extensions: [], install: null });
+  /** The language server prompt: shown by itself when the server is missing (`auto`), opened from the
+   *  status bar (`open`), or put away for this session (`closed`). */
+  lspPrompt = $state<'auto' | 'open' | 'closed'>('auto');
   toasts = $state<Toast[]>([]);
   hover = $state<HoverInfo | null>(null);
   menu = $state<ContextMenu | null>(null);

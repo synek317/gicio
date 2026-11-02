@@ -35,7 +35,7 @@ fn login_shell_path() -> Vec<PathBuf> {
 /// Where CLIs usually get installed, in case PATH misses them.
 fn usual_dirs() -> Vec<PathBuf> {
     let home = home();
-    let mut dirs: Vec<PathBuf> = [".local/bin", ".claude/local", ".npm-global/bin", ".cargo/bin", ".bun/bin", ".volta/bin"].iter().map(|d| home.join(d)).collect();
+    let mut dirs: Vec<PathBuf> = [".local/bin", ".claude/local", ".npm-global/bin", ".cargo/bin", ".bun/bin", ".volta/bin", ".dotnet/tools"].iter().map(|d| home.join(d)).collect();
     if cfg!(windows) {
         dirs.extend(std::env::var_os("APPDATA").map(|d| PathBuf::from(d).join("npm")));
     } else {

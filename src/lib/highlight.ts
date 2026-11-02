@@ -5,6 +5,7 @@ export interface Tok { text: string; style: string; col: number }
 const LANGS: Record<string, string> = {
   rs: 'rust', toml: 'toml', md: 'markdown', json: 'json', yml: 'yaml', yaml: 'yaml', ts: 'typescript', js: 'javascript',
   py: 'python', sh: 'shellscript', html: 'html', css: 'css', svelte: 'svelte', go: 'go', c: 'c', h: 'c', cpp: 'cpp',
+  cs: 'csharp', csx: 'csharp', csproj: 'xml', props: 'xml', targets: 'xml', xml: 'xml',
 };
 const LIMIT = 1_000_000;
 
