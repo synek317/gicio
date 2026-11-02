@@ -111,6 +111,14 @@ pub fn changed_files(root: &RepoRoot, base: &CommitId) -> Result<Vec<ChangedFile
     Ok(files)
 }
 
+/// Files in the working tree that git knows about or would add: tracked plus untracked, not ignored.
+pub fn listed_files(root: &RepoRoot) -> Result<Vec<FilePath>> {
+    let raw = git(root.path(), &["ls-files", "--cached", "--others", "--exclude-standard", "--deduplicate", "-z"])?;
+    let mut files: Vec<FilePath> = raw.split(|b| *b == 0).filter_map(|f| FilePath::new(&String::from_utf8_lossy(f)).ok()).collect();
+    files.sort();
+    Ok(files)
+}
+
 /// `path` at `commit` as it would look checked out (line endings converted like the working tree,
 /// e.g. CRLF with `core.autocrlf` on Windows), so it compares cleanly with the file on disk.
 pub fn show_file(root: &RepoRoot, commit: &CommitId, path: &FilePath) -> Result<Vec<u8>> {

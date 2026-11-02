@@ -2,10 +2,12 @@
   import { app } from '../state.svelte';
   import FileTree from './FileTree.svelte';
   import QueueList from './QueueList.svelte';
+  import SearchPanel from './SearchPanel.svelte';
 
   const tabs = [
     ['steps', 'Steps'],
     ['files', 'Files'],
+    ['search', 'Search'],
   ] as const;
 </script>
 
@@ -16,6 +18,6 @@
     {/each}
   </nav>
   <div class="side-body">
-    {#if app.sidebarTab === 'steps'}<QueueList />{:else}<FileTree />{/if}
+    {#if app.sidebarTab === 'steps'}<QueueList />{:else if app.sidebarTab === 'files'}<FileTree />{:else}<SearchPanel />{/if}
   </div>
 </aside>

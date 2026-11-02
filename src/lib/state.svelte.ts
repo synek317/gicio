@@ -7,7 +7,8 @@ export type View =
   | { kind: 'chunk'; id: string }
   | { kind: 'later' }
   | { kind: 'file'; path: string }
-  | { kind: 'source'; title: string; absPath: string; repoPath: string | null; line: number | null }
+  /** `col` / `len`: a range of `line` to select (UTF-16), e.g. a search match; else the whole line. */
+  | { kind: 'source'; title: string; absPath: string; repoPath: string | null; line: number | null; col?: number; len?: number }
   | { kind: 'refs'; title: string; locs: SourceLocation[] }
   | { kind: 'change'; id: string };
 export interface HistoryEntry { view: View; scroll: number }
@@ -41,7 +42,7 @@ class AppState {
   /** Hunk (view id) being edited in place; the editor opens at `line` (new side), which was `offset`
    *  pixels below the top of the diff scroller, so the code stays where it was on screen. */
   editing = $state<{ hunk: string; line: number | null; offset: number | null } | null>(null);
-  sidebarTab = $state<'steps' | 'files'>('steps');
+  sidebarTab = $state<'steps' | 'files' | 'search'>('steps');
   rightTab = $state<'conversations' | 'findings'>('conversations');
   showHelp = $state(false);
   lsp = $state<LspStatus>({ state: 'off', server: null, extensions: [], install: null });

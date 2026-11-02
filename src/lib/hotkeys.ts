@@ -2,7 +2,9 @@ import { api } from './api';
 import { acceptRestAndNext, back, closeEditor, editFocused, focusChat, forward, go, markTarget, moveChunk, moveFocus, nextPendingChunk, openComposer, run } from './actions';
 import { settings } from './app-settings.svelte';
 import { jumpFile, toggleCurrentFile } from './files-nav';
+import { closeFind, find, findStep, openFind } from './find.svelte';
 import { comboOf, type ActionId } from './keymap';
+import { openProjectSearch } from './project-search.svelte';
 import { app } from './state.svelte';
 
 const handlers: Record<ActionId, () => void> = {
@@ -31,12 +33,18 @@ const handlers: Record<ActionId, () => void> = {
   back: () => back(),
   forward: () => forward(),
   chat: () => focusChat(),
+  find: () => openFind(),
+  findNext: () => findStep(1),
+  findPrev: () => findStep(-1),
+  searchProject: () => openProjectSearch(),
   settings: () => (settings.open = true),
   help: () => (app.showHelp = !app.showHelp),
 };
 
 /** Actions that also work while typing (in the editor or a text box). */
-const WHILE_TYPING: ActionId[] = ['back', 'forward', 'settings'];
+const WHILE_TYPING: ActionId[] = ['back', 'forward', 'settings', 'find', 'findNext', 'findPrev', 'searchProject'];
+/** Actions a code editor hands over to the app instead of running its own (its search panel). */
+const FROM_EDITOR: ActionId[] = ['find', 'findNext', 'findPrev', 'searchProject'];
 
 export function actionFor(combo: string): ActionId | undefined {
   const kb = settings.value.keybindings;
@@ -51,6 +59,7 @@ export function handleKey(e: KeyboardEvent) {
     if (typing) t.blur();
     if (app.menu) app.menu = null;
     else if (app.showHelp) app.showHelp = false;
+    else if (find.open && !typing) closeFind();
     else if (app.composer) app.composer = null;
     else if (app.editing) closeEditor();
     else app.selection = [];
@@ -71,4 +80,14 @@ export function handleKey(e: KeyboardEvent) {
   if (!app.snap || (typing && !WHILE_TYPING.includes(action))) return;
   e.preventDefault();
   handlers[action]();
+}
+
+/** Key handler for code editors: runs the find shortcuts before the editor's own key bindings. */
+export function editorFindKey(e: KeyboardEvent): boolean {
+  const combo = comboOf(e);
+  const action = combo && actionFor(combo);
+  if (!action || !FROM_EDITOR.includes(action)) return false;
+  e.preventDefault();
+  handlers[action]();
+  return true;
 }

@@ -7,9 +7,11 @@
   import { currentChunkId } from '../actions';
   import { api } from '../api';
   import { lspExtensions } from '../cm-lsp';
+  import { cmFindTarget, findExtensions } from '../cm-find';
+  import { setFindTarget } from '../find.svelte';
   import { app } from '../state.svelte';
 
-  let { absPath, repoPath, line, title }: { absPath: string; repoPath: string | null; line: number | null; title: string } = $props();
+  let { absPath, repoPath, line, col = null, len = 0, title }: { absPath: string; repoPath: string | null; line: number | null; col?: number | null; len?: number; title: string } = $props();
 
   let host: HTMLElement | undefined = $state();
   let view = $state.raw<EditorView | null>(null);
@@ -31,9 +33,12 @@
     }
   }
 
-  function jumpTo(v: EditorView, n: number) {
+  /** Selects line `n`, or `length` characters of it from `column` (a search match). */
+  function jumpTo(v: EditorView, n: number, column: number | null, length: number) {
     const l = v.state.doc.line(Math.max(1, Math.min(n, v.state.doc.lines)));
-    v.dispatch({ selection: { anchor: l.from, head: l.to }, effects: EditorView.scrollIntoView(l.from, { y: 'center' }) });
+    const from = column != null && length ? Math.min(l.from + column, l.to) : l.from;
+    const to = column != null && length ? Math.min(from + length, l.to) : l.to;
+    v.dispatch({ selection: { anchor: from, head: to }, effects: EditorView.scrollIntoView(from, { y: 'center' }) });
   }
 
   // One editor per file; going to another line of the same file only moves the cursor.
@@ -58,16 +63,19 @@
               EditorView.updateListener.of((u) => u.docChanged && (app.editorDirty = true)),
               EditorView.theme({ '&': { height: '100%', fontSize: '12.5px' }, '.cm-scroller': { fontFamily: 'var(--mono)' } }),
               ...(path ? lspExtensions(path) : []),
+              findExtensions,
             ],
           }),
         });
         view = ed;
-        if (line) jumpTo(ed, line);
+        if (line) jumpTo(ed, line, col, len);
+        setFindTarget(cmFindTarget(ed));
         ed.focus();
       },
       (e) => (error = String(e)),
     );
     return () => {
+      if (ed) setFindTarget(null);
       ed?.destroy();
       view = null;
       app.editorDirty = false;
@@ -75,7 +83,7 @@
   });
 
   $effect(() => {
-    if (view && line) jumpTo(view, line);
+    if (view && line) jumpTo(view, line, col, len);
   });
 </script>
 

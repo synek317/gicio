@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import type { LaunchArgs, DiffOptions, FileDiff, FindingStatus, ReviewScope, StageMode, Symbol, Tool, AiBackend, AnchorInput, FileTexts, JobInfo, LineKey, LspStatus, MarkStatus, SendMode, Snapshot, SourceLocation, ThreadStatus } from './types';
+import type { SearchQuery, SearchResults, LaunchArgs, DiffOptions, FileDiff, FindingStatus, ReviewScope, StageMode, Symbol, Tool, AiBackend, AnchorInput, FileTexts, JobInfo, LineKey, LspStatus, MarkStatus, SendMode, Snapshot, SourceLocation, ThreadStatus } from './types';
 
 export const inTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
@@ -63,6 +63,7 @@ export const api = {
   lspHover: (path: string, line: number, character: number) => call<string | null>('lsp_hover', { path, line, character }),
   lspDefinition: (path: string, line: number, character: number) => call<SourceLocation[]>('lsp_definition', { path, line, character }),
   lspReferences: (path: string, line: number, character: number) => call<SourceLocation[]>('lsp_references', { path, line, character }),
+  searchProject: (query: SearchQuery) => call<SearchResults>('search_project', { query }),
 };
 
 export function onSession(cb: (s: Snapshot) => void): () => void {

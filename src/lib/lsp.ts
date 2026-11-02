@@ -59,8 +59,9 @@ export function keepHover() {
   clearTimeout(hideTimer);
 }
 
-/** Shows a location: scrolls when it is already on screen in the diff, otherwise opens the file. */
-export function openLocation(loc: SourceLocation) {
+/** Shows a location: scrolls when it is already on screen in the diff, otherwise opens the file
+ *  (selecting `length` characters from the location, or the whole line). */
+export function openLocation(loc: SourceLocation, length = 0) {
   const v = app.view;
   const inDiff = v && (v.kind === 'chunk' || v.kind === 'file' || v.kind === 'later');
   if (inDiff && loc.repoPath && document.querySelector(`[data-line="${CSS.escape(`${loc.repoPath}|new|${loc.line + 1}`)}"]`)) {
@@ -68,7 +69,7 @@ export function openLocation(loc: SourceLocation) {
     scrollToLine(loc.repoPath, 'new', loc.line + 1);
     return;
   }
-  go({ kind: 'source', title: loc.repoPath ?? loc.absPath, absPath: loc.absPath, repoPath: loc.repoPath, line: loc.line + 1 });
+  go({ kind: 'source', title: loc.repoPath ?? loc.absPath, absPath: loc.absPath, repoPath: loc.repoPath, line: loc.line + 1, ...(length ? { col: loc.character, len: length } : {}) });
 }
 
 /** Definition in the main window; several candidates are listed like references. */

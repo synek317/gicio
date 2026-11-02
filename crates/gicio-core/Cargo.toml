@@ -16,3 +16,4 @@ serde_json = { workspace = true }
 tokio = { workspace = true }
 similar = "2"
 globset = "0.4"
+regex = "1"

@@ -137,6 +137,10 @@ Nothing is committed, ever. The AI only edits your working tree, and only when y
   project. Lines you had already accepted stay accepted (or ask for another look, your choice), and
   lines the rename adds to the change count as your own edit. If the target is already on screen, the
   view scrolls there; otherwise the file opens in the main window.
+- **Find** (⌘F / Ctrl+F) in what is on screen: the diff of the step or the open file, with match
+  case, whole word and regular expression switches (⌥C / ⌥W / ⌥R); Enter / F3 for the next match.
+  **Search the whole project** (⇧⌘F / Ctrl+Shift+F) in the sidebar, with the same switches and
+  "files to include / exclude" globs (`*.rs`, `src/lib`, `tests`), like in VS Code.
 - Edit code **in place**: "✎ Edit" (or `e`) turns a hunk into an editor right in the diff. "Open file"
   shows the whole file in the built-in editor (CodeMirror). Lines you write yourself count as accepted,
   and the diff and steps update on save.

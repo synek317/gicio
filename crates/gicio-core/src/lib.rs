@@ -6,6 +6,7 @@ pub mod lsp;
 pub mod process;
 pub mod project;
 pub mod review;
+pub mod search;
 pub mod skip;
 pub mod stage;
 pub mod store;

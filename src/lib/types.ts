@@ -82,3 +82,11 @@ export type LspStatus = ({ state: 'off' | 'missing' | 'installing' | 'starting' 
 export interface SourceLocation { absPath: string; repoPath: string | null; line: number; character: number; preview: string | null }
 export interface LaunchArgs { repo: string | null; since: string | null; start: boolean; warning: string | null }
 export interface FileTexts { old: string; new: string; binary: boolean }
+
+/** A project search; `include` / `exclude` are comma-separated globs. */
+export interface SearchQuery { pattern: string; caseSensitive: boolean; wholeWord: boolean; regex: boolean; include: string; exclude: string }
+/** A line with matches. `line` is 1-based; `column` / `length` (UTF-16) are the first match in the whole
+ *  line; `ranges` mark the matches inside `preview`, which is cut around them. */
+export interface LineHit { line: number; column: number; length: number; preview: string; ranges: [number, number][]; matches: number }
+export interface FileHits { path: string; absPath: string; lines: LineHit[] }
+export interface SearchResults { files: FileHits[]; matches: number; truncated: boolean }

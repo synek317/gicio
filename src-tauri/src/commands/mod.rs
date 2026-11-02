@@ -7,6 +7,7 @@ pub mod lsp;
 pub mod marks;
 pub mod plan;
 pub mod review;
+pub mod search;
 pub mod session;
 pub mod threads;
 pub mod tools;

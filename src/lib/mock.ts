@@ -1,7 +1,8 @@
 // Browser-only stand-in for the Tauri backend, so the UI can be developed with `npm run dev`.
 // Loads a snapshot dumped by `cargo run -p gicio-core --example cli -- <repo> <base> dump static/dev-fixture.json`.
+import { compileFind, matchRanges } from './find-query';
 import { keyOf } from './keys';
-import type { FileTexts, JobInfo, LineKey, LspStatus, Mark, MarkStatus, Snapshot } from './types';
+import type { FileHits, FileTexts, JobInfo, LineKey, LspStatus, Mark, MarkStatus, SearchQuery, SearchResults, Snapshot } from './types';
 
 interface Fixture { snapshot: Snapshot; texts: Record<string, FileTexts>; jobs?: JobInfo[] }
 
@@ -185,7 +186,37 @@ export async function mockInvoke(cmd: string, args: Record<string, any> = {}): P
     case 'save_file':
       fx.texts[args.path] = { ...fx.texts[args.path], new: args.text };
       return bump();
+    case 'search_project':
+      return mockSearch(fx, s.repo, args.query as SearchQuery);
     default:
       throw new Error(`mock: ${cmd} not supported`);
   }
+}
+
+/** Rough stand-in for the globs of a project search: `*.ext` by extension, anything else by substring. */
+function globHit(list: string, path: string): boolean | null {
+  const parts = list.split(',').map((p) => p.trim()).filter(Boolean);
+  if (!parts.length) return null;
+  return parts.some((p) => (p.startsWith('*.') ? path.endsWith(p.slice(1)) : path.includes(p.replace(/\*+/g, ''))));
+}
+
+/** Project search over the files of the fixture (new side). */
+function mockSearch(fx: Fixture, repo: string, q: SearchQuery): SearchResults {
+  const re = compileFind({ query: q.pattern, caseSensitive: q.caseSensitive, wholeWord: q.wholeWord, regex: q.regex });
+  const files: FileHits[] = [];
+  let matches = 0;
+  for (const [path, t] of Object.entries(fx.texts).sort(([a], [b]) => a.localeCompare(b))) {
+    if (globHit(q.include, path) === false || globHit(q.exclude, path) === true || t.binary) continue;
+    const lines = t.new.split('\n').flatMap((text, i) => {
+      const found = matchRanges(text, re, q.wholeWord);
+      if (!found.length) return [];
+      const indent = text.length - text.trimStart().length;
+      const preview = text.trim();
+      return [{ line: i + 1, column: found[0][0], length: found[0][1] - found[0][0], preview, ranges: found.map(([a, b]) => [a - indent, b - indent] as [number, number]), matches: found.length }];
+    });
+    if (!lines.length) continue;
+    matches += lines.reduce((n, l) => n + l.matches, 0);
+    files.push({ path, absPath: `${repo}/${path}`, lines });
+  }
+  return { files, matches, truncated: false };
 }

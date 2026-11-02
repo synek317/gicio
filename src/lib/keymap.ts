@@ -23,6 +23,10 @@ export const ACTIONS = [
   { id: 'back', label: 'Back', keys: ['mod+-', 'mod+['] },
   { id: 'forward', label: 'Forward', keys: ['mod+=', 'mod+]'] },
   { id: 'chat', label: 'Talk about the whole change', keys: ['t', 'g'] },
+  { id: 'find', label: 'Find in what is shown', keys: ['mod+f', 'alt+f'] },
+  { id: 'findNext', label: 'Next match', keys: ['f3', 'mod+g'] },
+  { id: 'findPrev', label: 'Previous match', keys: ['shift+f3', 'mod+shift+g'] },
+  { id: 'searchProject', label: 'Search the whole project', keys: ['mod+shift+f', 'alt+shift+f'] },
   { id: 'settings', label: 'Settings', keys: ['mod+,', 'shift+,'] },
   { id: 'help', label: 'Keyboard help', keys: ['?', 'f1'] },
 ] as const;
