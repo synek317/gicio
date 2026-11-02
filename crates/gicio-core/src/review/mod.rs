@@ -5,6 +5,7 @@ mod coverage;
 mod export;
 mod finding;
 mod fallback_plan;
+mod line_endings;
 mod marks;
 mod reconcile;
 mod session;

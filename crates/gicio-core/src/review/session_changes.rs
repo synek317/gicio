@@ -1,3 +1,4 @@
+use super::line_endings::with_line_endings_of;
 use super::{AgentChange, ChangeStatus, LineKey, MarkStatus, Session};
 use crate::diff::{compute_hunks, FileDiff, FileStatus, Side};
 use crate::domain::{ChangeId, FilePath, ThreadId, TreeId};
@@ -94,12 +95,16 @@ impl Session {
         let mut skipped = Vec::new();
         for path in &c.files {
             let abs = self.state.repo.join(path);
-            if std::fs::read(&abs).ok() != git::tree_file(&self.state.repo, &c.after, path) {
+            if !git::worktree_matches(&self.state.repo, &c.after, path) {
                 skipped.push(path.clone());
                 continue;
             }
-            match git::tree_file(&self.state.repo, &c.before, path) {
-                Some(bytes) => std::fs::write(&abs, bytes).with_context(|| format!("cannot restore {path}"))?,
+            match git::tree_file_stored(&self.state.repo, &c.before, path) {
+                // Snapshots keep no line endings of their own: write them the way the file has them now.
+                Some(bytes) => {
+                    let now = std::fs::read(&abs).unwrap_or_default();
+                    std::fs::write(&abs, with_line_endings_of(&bytes, &now)).with_context(|| format!("cannot restore {path}"))?
+                }
                 None => std::fs::remove_file(&abs).with_context(|| format!("cannot remove {path}"))?,
             }
         }
@@ -180,6 +185,38 @@ mod tests {
         assert_eq!(status(&s, "a.rs", 3), Some(MarkStatus::Accepted));
         assert_eq!(status(&s, "b.rs", 1), Some(MarkStatus::Accepted));
         assert_eq!(status(&s, "a.rs", 2), None);
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// As on Windows, where `core.autocrlf` makes git check files out with CRLF.
+    fn with_autocrlf(dir: &Path) {
+        assert!(Command::new("git").current_dir(dir).args(["config", "core.autocrlf", "true"]).output().unwrap().status.success());
+    }
+
+    #[test]
+    fn rejecting_works_with_autocrlf_and_lf_files() {
+        let dir = repo("reject-autocrlf-lf");
+        with_autocrlf(&dir);
+        let mut s = open(&dir);
+        let id = ai_edit(&mut s, &dir);
+        assert!(s.reject_change(&id).unwrap().is_empty());
+        assert_eq!(std::fs::read_to_string(dir.join("a.rs")).unwrap(), "fn a() {}\nfn reviewed() {}\n");
+        assert!(!dir.join("b.rs").exists());
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn rejecting_keeps_crlf_line_endings() {
+        let dir = repo("reject-autocrlf-crlf");
+        with_autocrlf(&dir);
+        std::fs::write(dir.join("a.rs"), "fn a() {}\r\nfn reviewed() {}\r\n").unwrap();
+        let mut s = open(&dir);
+        let before = s.snapshot_tree();
+        std::fs::write(dir.join("a.rs"), "fn a() {}\r\nfn reviewed() {}\r\nfn by_ai() {}\r\n").unwrap();
+        s.refresh(None).unwrap();
+        let id = s.record_change(before, "edit", "ai", None).unwrap();
+        assert!(s.reject_change(&id).unwrap().is_empty());
+        assert_eq!(std::fs::read_to_string(dir.join("a.rs")).unwrap(), "fn a() {}\r\nfn reviewed() {}\r\n");
         std::fs::remove_dir_all(&dir).unwrap();
     }
 

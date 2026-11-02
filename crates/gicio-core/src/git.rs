@@ -211,3 +211,18 @@ pub fn changed_between(root: &RepoRoot, a: &TreeId, b: &TreeId) -> Result<Vec<Fi
 pub fn tree_file(root: &RepoRoot, tree: &TreeId, path: &FilePath) -> Option<Vec<u8>> {
     git(root.path(), &["cat-file", "--filters", &format!("{}:{}", tree.as_str(), path.as_str())]).ok()
 }
+
+/// `path` in a snapshot exactly as stored (line endings as `git add` normalised them).
+pub fn tree_file_stored(root: &RepoRoot, tree: &TreeId, path: &FilePath) -> Option<Vec<u8>> {
+    git(root.path(), &["cat-file", "blob", &format!("{}:{}", tree.as_str(), path.as_str())]).ok()
+}
+
+/// Whether `path` on disk has the content a snapshot recorded for it (both missing counts too).
+/// Compared as `git add` would store it, so line endings alone (CRLF with `core.autocrlf`) are no edit.
+pub fn worktree_matches(root: &RepoRoot, tree: &TreeId, path: &FilePath) -> bool {
+    let recorded = git_str(root.path(), &["rev-parse", "--verify", "-q", &format!("{}:{}", tree.as_str(), path.as_str())]).ok();
+    if !root.join(path).exists() {
+        return recorded.is_none();
+    }
+    git_str(root.path(), &["hash-object", "--", path.as_str()]).is_ok_and(|on_disk| recorded.as_deref() == Some(on_disk.as_str()))
+}
