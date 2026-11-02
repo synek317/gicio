@@ -17,6 +17,8 @@ pub enum Tool {
 #[tauri::command]
 pub async fn run_tool(app: AppHandle, state: State<'_, AppState>, tool: Tool) -> Result<String, String> {
     let repo = state.session()?.state.repo.clone();
+    // fmt and clippy --fix edit code: record what they change, to look at and keep or undo.
+    let before = if matches!(tool, Tool::Clippy) { None } else { gicio_core::git::worktree_tree(&repo).ok() };
     let report = match tool {
         Tool::Fmt => run_tool_job(&app, "cargo fmt", tools::cargo_fmt(&repo)).await.map(|_| "cargo fmt done".to_string())?,
         Tool::ClippyFix => run_tool_job(&app, "cargo clippy --fix", tools::cargo_clippy_fix(&repo)).await.map(|_| "clippy fixes applied".to_string())?,
@@ -30,7 +32,9 @@ pub async fn run_tool(app: AppHandle, state: State<'_, AppState>, tool: Tool) ->
     };
     let mut s = state.session()?;
     s.refresh(None).map_err(|e| e.to_string())?;
+    let title = if matches!(tool, Tool::Fmt) { "cargo fmt" } else { "cargo clippy --fix" };
+    let changed = s.record_change(before, title, title, None).is_some();
     publish(&app, &s);
-    Ok(report)
+    Ok(if changed { format!("{report}; see its changes under “AI changes” in the steps list") } else { format!("{report}; nothing changed") })
 }
 

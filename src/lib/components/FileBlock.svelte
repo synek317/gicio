@@ -1,6 +1,6 @@
 <script lang="ts">
   import { editFile, markKeys } from '../actions';
-  import { blockKey, jumpFile, setCollapsed } from '../files-nav';
+  import { blockKey, setCollapsed, showNextFile } from '../files-nav';
   import { changedKeys } from '../keys';
   import { hunksProgress } from '../progress';
   import { app } from '../state.svelte';
@@ -26,9 +26,11 @@
     if (file) texts.ensure(file);
   });
 
+  /** Accepts the file, folds it and brings the next file's start into view. */
   async function accept() {
-    await markKeys(unaccepted, 'accepted');
+    await markKeys(unaccepted, 'accepted', false);
     setCollapsed(path, true);
+    showNextFile(block);
   }
 
   async function unaccept() {
@@ -44,20 +46,20 @@
     <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
     <span class="path" onclick={() => setCollapsed(path, !collapsed)}>{#if file?.oldPath}<span class="muted">{file.oldPath} → </span>{/if}{path}</span>
     <span class="prog">{#if done}✓ {/if}{prog.accepted + prog.deferred}/{prog.total}{#if !whole} <span class="muted">· {fileTotal} in file</span>{/if}</span>
+    {#if done}<span class="stamp">Done</span>{/if}
     <span class="spacer"></span>
     {#if file?.status !== 'deleted'}
-      <button class="ghost" onclick={() => editFile(path, hunks[0]?.newStart ?? 1)} title="Open the whole file as it is now; you can edit it there">Open file</button>
+      <button class="ghost secondary" onclick={() => editFile(path, hunks[0]?.newStart ?? 1)} title="Open the whole file as it is now; you can edit it there">Open file</button>
+    {/if}
+    {#if accepted.length}
+      <button class="ghost secondary" onclick={unaccept} title="Take back the acceptance of these lines (they become pending again)">↺ Unaccept{unaccepted.length ? ` (${accepted.length})` : ''}</button>
     {/if}
     {#if unaccepted.length}
-      <button onclick={() => markKeys(unaccepted, 'deferred')} title="Put these changes off for later">Later</button>
+      <button class="secondary" onclick={() => markKeys(unaccepted, 'deferred')} title="Put these changes off for later">Later</button>
       <button class="primary-soft" onmouseenter={() => previewOn(unaccepted)} onmouseleave={previewOff} onclick={accept} title={whole ? 'Accept all changes in this file' : 'Accept the changes of this file shown in this step; the rest of the file is in other steps'}>
         ✓ {whole ? 'Accept file' : `Accept this part (${prog.total} lines)`}
       </button>
     {/if}
-    {#if accepted.length}
-      <button class="ghost" onclick={unaccept} title="Take back the acceptance of these lines (they become pending again)">↺ Unaccept{unaccepted.length ? ` (${accepted.length})` : ''}</button>
-    {/if}
-    <button class="ghost" onclick={() => jumpFile(1)} title="Next file (f)">↓</button>
   </header>
   {#if !collapsed}
     {#each hunks as hunk (hunk.id)}

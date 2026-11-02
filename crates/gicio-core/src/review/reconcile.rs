@@ -6,6 +6,7 @@ use std::collections::{HashMap, HashSet};
 /// Where to put hunks that appeared because of a discussion.
 pub struct FollowUp {
     pub id: ChunkId,
+    /// The step the new changes follow; `None` puts them at the end of the queue.
     pub after: Option<ChunkId>,
     pub title: String,
     pub thread: Option<ThreadId>,
@@ -42,9 +43,12 @@ pub fn reconcile(chunks: &mut Vec<Chunk>, files: &[FileDiff], follow_up: Option<
             Some(f) => (f.id, f.after, f.title, f.thread),
             None => (ChunkId::from_raw(format!("c-new-{}", leftovers[0].id)), None, "New changes".to_string(), None),
         };
-        let at = after.and_then(|a| chunks.iter().position(|c| c.id == a)).map(|p| p + 1).unwrap_or(chunks.len());
+        let after = after.and_then(|a| chunks.iter().position(|c| c.id == a));
+        let at = after.map(|p| p + 1).unwrap_or(chunks.len());
+        // A follow-up of a step stays inside that step's feature.
+        let group = after.and_then(|p| chunks[p].group.clone());
         let summary = "Changes that appeared after the review started.".to_string();
-        chunks.insert(at, Chunk { id, title, summary, hunks: leftovers, origin: ChunkOrigin::FollowUp { thread }, notes: Vec::new() });
+        chunks.insert(at, Chunk { id, title, summary, hunks: leftovers, origin: ChunkOrigin::FollowUp { thread }, notes: Vec::new(), group });
     }
 
     let order: HashMap<&HunkId, usize> = hunks.iter().enumerate().map(|(i, h)| (&h.id, i)).collect();
@@ -54,4 +58,46 @@ pub fn reconcile(chunks: &mut Vec<Chunk>, files: &[FileDiff], follow_up: Option<
     chunks.retain(|c| !c.hunks.is_empty());
 
     hunks.iter().map(|h| h.id.clone()).filter(|id| !previous.contains(id)).collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::diff::{DiffLine, FileStatus, LineKind};
+    use crate::domain::FilePath;
+
+    fn hunk(id: &str, old_start: u32) -> Hunk {
+        let line = DiffLine { kind: LineKind::Added, old_no: None, new_no: Some(old_start), text: id.into() };
+        Hunk { id: HunkId::from_content("a.rs", id, 0), path: FilePath::new("a.rs").unwrap(), old_start, old_len: 0, new_start: old_start, new_len: 1, lines: vec![line] }
+    }
+
+    fn chunk(id: &str, h: &Hunk, group: Option<&str>) -> Chunk {
+        Chunk { id: ChunkId::from_raw(id), title: id.into(), summary: String::new(), hunks: vec![HunkRef::of(h)], origin: ChunkOrigin::Ai, notes: Vec::new(), group: group.map(Into::into) }
+    }
+
+    fn files(hunks: Vec<Hunk>) -> Vec<FileDiff> {
+        vec![FileDiff { path: FilePath::new("a.rs").unwrap(), old_path: None, status: FileStatus::Modified, binary: false, hunks }]
+    }
+
+    fn follow_up(after: Option<&str>) -> FollowUp {
+        FollowUp { id: ChunkId::from_raw("new"), after: after.map(ChunkId::from_raw), title: "Follow-up".into(), thread: None }
+    }
+
+    #[test]
+    fn follow_up_of_a_step_stays_in_its_feature() {
+        let (h1, h2, h3) = (hunk("h1", 10), hunk("h2", 50), hunk("h3", 90));
+        let mut chunks = vec![chunk("c1", &h1, Some("Feature")), chunk("c2", &h2, Some("Feature"))];
+        reconcile(&mut chunks, &files(vec![h1, h2, h3]), Some(follow_up(Some("c1"))));
+        let ids: Vec<&str> = chunks.iter().map(|c| c.id.as_str()).collect();
+        assert_eq!(ids, ["c1", "new", "c2"]);
+        assert_eq!(chunks[1].group.as_deref(), Some("Feature"));
+    }
+
+    #[test]
+    fn follow_up_at_the_end_belongs_to_no_feature() {
+        let (h1, h2) = (hunk("h1", 10), hunk("h2", 90));
+        let mut chunks = vec![chunk("c1", &h1, Some("Feature"))];
+        reconcile(&mut chunks, &files(vec![h1, h2]), Some(follow_up(None)));
+        assert_eq!(chunks.last().map(|c| (c.id.as_str(), c.group.clone())), Some(("new", None)));
+    }
 }

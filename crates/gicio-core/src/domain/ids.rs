@@ -29,6 +29,7 @@ macro_rules! string_id {
 
 string_id!(ChunkId, "c");
 string_id!(ThreadId, "t");
+string_id!(ChangeId, "a");
 
 /// Content-derived id of a hunk: stays the same as long as the hunk's text doesn't change.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]

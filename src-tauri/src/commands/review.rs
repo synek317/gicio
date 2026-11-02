@@ -4,23 +4,25 @@ use crate::state::AppState;
 use gicio_core::ai::{self, AccessMode};
 use gicio_core::diff::Side;
 use gicio_core::domain::{ChunkId, FilePath, ThreadId};
-use gicio_core::review::{export_markdown, Author, FindingId, FindingStatus, HunkRef, Message, MessageKind, Snapshot};
+use gicio_core::review::{export_markdown, Author, FindingId, FindingStatus, HunkRef, Message, MessageKind, Snapshot, Thread, ThreadStatus};
 use serde::Deserialize;
 use std::collections::HashSet;
 use tauri::{AppHandle, Manager, State};
 
-/// Sends every pending review comment to the AI as one task (like submitting a GitHub review).
+/// Hands every issue left for later to the AI as one task (like submitting a GitHub review).
 #[tauri::command]
-pub fn submit_review(app: AppHandle, state: State<'_, AppState>) -> Result<Snapshot, String> {
+pub fn resolve_later(app: AppHandle, state: State<'_, AppState>) -> Result<Snapshot, String> {
     let mut s = state.session()?;
-    let threads: Vec<ThreadId> = s.state.threads.iter().filter(|t| t.messages.iter().any(|m| m.pending)).map(|t| t.id.clone()).collect();
-    if threads.is_empty() {
-        return Err("no pending review comments".into());
+    let later: Vec<&Thread> = s.state.threads.iter().filter(|t| t.status == ThreadStatus::Deferred && !t.busy).collect();
+    if later.is_empty() {
+        return Err("nothing left for later".into());
     }
+    let mode = if later.iter().any(|t| t.allow_edits) { AccessMode::Edit } else { AccessMode::ReadOnly };
+    let threads: Vec<ThreadId> = later.iter().map(|t| t.id.clone()).collect();
     let prompt = ai::build_review_prompt(&s, &threads, &state.settings.instructions());
     for t in s.state.threads.iter_mut().filter(|t| threads.contains(&t.id)) {
         t.busy = true;
-        t.messages.iter_mut().for_each(|m| m.pending = false);
+        t.status = ThreadStatus::Open;
     }
     s.touch();
     let snap = publish(&app, &s);
@@ -28,9 +30,10 @@ pub fn submit_review(app: AppHandle, state: State<'_, AppState>) -> Result<Snaps
     drop(s);
     tauri::async_runtime::spawn(async move {
         let state = app.state::<AppState>();
-        let _turn = state.jobs.todo_lock.lock().await;
-        let title = format!("Review with {} comment(s)", threads.len());
-        let res = run_ai_job(&app, JobKind::Review, &title, &backend, &repo, &prompt, AccessMode::Edit).await;
+        let _turn = state.jobs.edit_lock.lock().await;
+        let title = format!("Resolve {} issue(s) left for later", threads.len());
+        let before = if mode == AccessMode::Edit { gicio_core::git::worktree_tree(&repo).ok() } else { None };
+        let res = run_ai_job(&app, JobKind::Review, &title, &backend, &repo, &prompt, mode).await;
         let Ok(mut s) = state.session() else { return };
         let author = Author::Ai { backend: backend.label() };
         match &res {
@@ -48,12 +51,10 @@ pub fn submit_review(app: AppHandle, state: State<'_, AppState>) -> Result<Snaps
                 let _ = s.push_message(&threads[0], Message::new(Author::System, MessageKind::Error, e.clone()));
             }
         }
-        let after = s.state.chunks.last().map(|c| c.id.clone());
-        if let Ok(r) = s.refresh(Some((after, title.clone(), Some(threads[0].clone()))))
-            && !r.touched_files.is_empty()
-        {
-            let files = r.touched_files.iter().map(|f| format!("`{f}`")).collect::<Vec<_>>().join(", ");
-            let _ = s.push_message(&threads[0], Message::new(Author::System, MessageKind::CodeChanged, format!("Code changed in {files}; added as a step at the end of the queue.")));
+        let _ = s.refresh(Some((None, title.clone(), Some(threads[0].clone()))));
+        if let Some(change) = s.record_change(before, &title, &backend.label(), Some(threads[0].clone())) {
+            let body = format!("Code changed in {}; added as a step at the end.", s.change_files(&change));
+            let _ = s.push_message(&threads[0], Message::new(Author::System, MessageKind::CodeChanged, body).with_change(Some(change)));
         }
         for t in s.state.threads.iter_mut().filter(|t| threads.contains(&t.id)) {
             t.busy = false;
@@ -145,8 +146,9 @@ pub fn fix_findings(app: AppHandle, state: State<'_, AppState>, ids: Vec<Finding
     drop(s);
     tauri::async_runtime::spawn(async move {
         let state = app.state::<AppState>();
-        let _turn = state.jobs.todo_lock.lock().await;
+        let _turn = state.jobs.edit_lock.lock().await;
         let title = if findings.len() == 1 { format!("Fix: {}", findings[0].title) } else { format!("Fix {} findings", findings.len()) };
+        let before = gicio_core::git::worktree_tree(&repo).ok();
         let res = run_ai_job(&app, JobKind::Fix, &title, &backend, &repo, &prompt, AccessMode::Edit).await;
         let Ok(mut s) = state.session() else { return };
         s.set_finding_status(&ids, if res.is_ok() { FindingStatus::Fixed } else { FindingStatus::Open });
@@ -154,9 +156,9 @@ pub fn fix_findings(app: AppHandle, state: State<'_, AppState>, ids: Vec<Finding
             Ok(a) => format!("**{title}**\n\n{}", a.trim()),
             Err(e) => format!("{title} failed: {e}"),
         };
-        s.state.chat.push(Message::new(Author::Ai { backend: backend.label() }, if res.is_ok() { MessageKind::Text } else { MessageKind::Error }, body));
-        let after = s.state.chunks.last().map(|c| c.id.clone());
-        let _ = s.refresh(Some((after, title, None)));
+        let _ = s.refresh(Some((None, title.clone(), None)));
+        let change = s.record_change(before, &title, &backend.label(), None);
+        s.state.chat.push(Message::new(Author::Ai { backend: backend.label() }, if res.is_ok() { MessageKind::Text } else { MessageKind::Error }, body).with_change(change));
         publish(&app, &s);
     });
     Ok(snap)

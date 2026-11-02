@@ -14,6 +14,7 @@
   const initial = optionsOf(snap);
   let options = $state<StartOptions>({ ...initial });
   let form = $state<BackendForm>(fromBackend(snap.backend));
+  let ignoreWhitespace = $state(snap.diffOptions.ignoreWhitespace);
   let asDefault = $state(false);
   let busy = $state(false);
 
@@ -27,6 +28,7 @@
       } else {
         if (JSON.stringify(toBackend(form)) !== JSON.stringify(snap.backend)) await run(api.setBackend(toBackend(form)));
         if (stageOf(options) !== snap.stageMode) await run(api.setStageMode(stageOf(options)));
+        if (ignoreWhitespace !== snap.diffOptions.ignoreWhitespace) await run(api.setDiffOptions({ ignoreWhitespace }));
         if (options.order !== initial.order) {
           if (options.order === 'ai') plan(false);
           else await run(api.planByFiles());
@@ -50,6 +52,7 @@
     <p class="muted small"><code>{snap.repo}</code></p>
     <div class="settings-body">
       <ReviewOptions bind:options repo={snap.repo} idPrefix="review" />
+      <label class="toggle"><input type="checkbox" bind:checked={ignoreWhitespace} /> Ignore whitespace-only changes</label>
       <BackendPicker bind:form />
       {#if baseOf(options) !== baseOf(initial)}
         <p class="warn-text small">A different base opens a separate review (your progress on this one is kept and comes back when you switch back).</p>

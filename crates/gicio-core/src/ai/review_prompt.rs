@@ -1,4 +1,4 @@
-//! "Submit review": all pending reviewer comments go to the AI as one task.
+//! "Resolve later": every issue the reviewer left for later goes to the AI as one task.
 
 use super::json_extract::extract_object_with_key;
 use super::overview::change_overview;
@@ -8,7 +8,7 @@ use crate::review::{Author, Session};
 use serde::Deserialize;
 
 pub fn build_review_prompt(s: &Session, threads: &[ThreadId], extra: &ExtraInstructions) -> String {
-    let mut out = String::from("A human reviewed a code change and left the comments below. Address all of them in one go.\n");
+    let mut out = String::from("A human reviewing a code change left the comments below for later. Address all of them in one go.\n");
     out.push_str(&change_overview(s));
     out.push_str("\nComments:\n");
     for id in threads {
@@ -18,6 +18,11 @@ pub fn build_review_prompt(s: &Session, threads: &[ThreadId], extra: &ExtraInstr
             out.push_str(&format!("On {} lines {}-{} ({}):\n```\n{}\n```\n", a.path, a.start, a.end, if a.side == crate::diff::Side::Old { "removed lines" } else { "current code" }, a.excerpt));
         } else if let Some(c) = t.chunk.as_ref().and_then(|c| s.chunk(c)) {
             out.push_str(&format!("About review step \"{}\"\n", c.title));
+        } else {
+            out.push_str("About the whole change\n");
+        }
+        if !t.allow_edits {
+            out.push_str("(Answer only: do not edit any file for this comment.)\n");
         }
         for m in &t.messages {
             let who = match m.author {

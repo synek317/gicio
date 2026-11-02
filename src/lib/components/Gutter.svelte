@@ -2,7 +2,7 @@
   import { markKeys, selectLine } from '../actions';
   import type { Cell } from '../rows';
   import type { MarkStatus } from '../types';
-  import { drag } from '../drag';
+  import { drag } from '../drag.svelte';
 
   let { cell, oldNo, newNo, status, unified }: { cell: Cell; oldNo: number | null; newNo: number | null; status: MarkStatus | undefined; unified: boolean } = $props();
 

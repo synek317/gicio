@@ -1,10 +1,11 @@
 <script lang="ts">
-  import { editFile, focusHunk, markKeys } from '../actions';
+  import { closeEditor, editHunk, focusHunk, markKeys } from '../actions';
   import { changedKeys } from '../keys';
   import { hunkProgress } from '../progress';
   import { splitRows, unifiedRows } from '../rows';
   import { app } from '../state.svelte';
   import type { Hunk } from '../types';
+  import InlineEditor from './InlineEditor.svelte';
   import LineCell from './LineCell.svelte';
   import { enclosingRange, extendHunk, room } from '../expand';
   import { texts } from '../texts.svelte';
@@ -15,6 +16,7 @@
   let { hunk }: { hunk: Hunk } = $props();
 
   const focused = $derived(app.focusedHunk === hunk.id);
+  const editing = $derived(app.editing?.hunk === hunk.id);
   const prog = $derived(hunkProgress(hunk, app.marks));
   const keys = $derived(changedKeys(hunk));
   // A side-by-side view of an added or deleted file is half empty.
@@ -73,6 +75,7 @@
 <section
   class="hunk"
   class:focused
+  class:editing
   class:done={prog.pending === 0}
   id="hunk-{hunk.id}"
   onclick={() => (app.focusedHunk = hunk.id)}
@@ -89,7 +92,11 @@
       <button onclick={(e) => { e.stopPropagation(); markKeys(keys, 'deferred'); }}>Later</button>
     {/if}
     {#if space.before + space.after > 0}<button class="ghost" onclick={wholeFunction} title="Show the whole enclosing function (rust-analyzer, or a guess for other languages)">⤢ Function</button>{/if}
-    {#if status !== 'deleted'}<button class="ghost" onclick={(e) => { e.stopPropagation(); editFile(hunk.path, hunk.newStart); }} title="Open the file at this place; you can edit it there (e)">Open</button>{/if}
+    {#if editing}
+      <button class="ghost close-editor" onclick={(e) => { e.stopPropagation(); closeEditor(); }} title="Close the editor (Esc); asks before discarding changes">✕</button>
+    {:else if status !== 'deleted'}
+      <button class="ghost" onclick={(e) => { e.stopPropagation(); editHunk(hunk.id); }} title="Edit these lines right here (e)">✎ Edit</button>
+    {/if}
     {#if prog.accepted + prog.deferred > 0}
       <button class="ghost" onclick={(e) => { e.stopPropagation(); markKeys(keys, null, false); }} title="Back to pending">↺ {prog.accepted === prog.total ? 'Unaccept' : 'Reset'}</button>
     {/if}
@@ -108,6 +115,9 @@
       {/each}
     </div>
   {/if}
+  {#if editing}
+    <InlineEditor hunk={shown} />
+  {:else}
   {#if extra.before < space.before}
     <div class="expand-row"><button onclick={(e) => { e.stopPropagation(); grow(STEP, 0); }}>↑ {Math.min(STEP, space.before - extra.before)} more lines</button></div>
   {/if}
@@ -129,5 +139,6 @@
   {/if}
   {#if extra.after < space.after}
     <div class="expand-row"><button onclick={(e) => { e.stopPropagation(); grow(0, STEP); }}>↓ {Math.min(STEP, space.after - extra.after)} more lines</button></div>
+  {/if}
   {/if}
 </section>

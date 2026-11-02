@@ -27,6 +27,9 @@ pub struct ReviewState {
     pub summary: Option<Message>,
     #[serde(default)]
     pub findings: Vec<super::Finding>,
+    /// What AI jobs changed, to keep or undo.
+    #[serde(default)]
+    pub changes: Vec<super::AgentChange>,
     /// Fingerprint of the change at the last save, to recognise it next time.
     #[serde(default)]
     pub line_signature: Vec<u64>,
@@ -38,7 +41,7 @@ pub struct ReviewState {
 
 impl ReviewState {
     pub fn new(repo: RepoRoot, base_ref: GitRef, base_commit: CommitId, backend: AiBackend) -> Self {
-        Self { repo, base_ref, base_commit, backend, chunks: Vec::new(), marks: Marks::default(), threads: Vec::new(), planned_by_ai: false, diff_options: Default::default(), stage_mode: Default::default(), chat: Vec::new(), summary: None, findings: Vec::new(), line_signature: Vec::new(), last_chunk: None, next_id: 1 }
+        Self { repo, base_ref, base_commit, backend, chunks: Vec::new(), marks: Marks::default(), threads: Vec::new(), planned_by_ai: false, diff_options: Default::default(), stage_mode: Default::default(), chat: Vec::new(), summary: None, findings: Vec::new(), changes: Vec::new(), line_signature: Vec::new(), last_chunk: None, next_id: 1 }
     }
 
     fn next(&mut self) -> u64 {
@@ -53,6 +56,10 @@ impl ReviewState {
 
     pub fn next_thread_id(&mut self) -> ThreadId {
         ThreadId::new(self.next())
+    }
+
+    pub fn next_change_id(&mut self) -> crate::domain::ChangeId {
+        crate::domain::ChangeId::new(self.next())
     }
 
     pub fn next_finding_id(&mut self) -> super::FindingId {

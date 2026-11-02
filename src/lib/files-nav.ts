@@ -32,6 +32,29 @@ export function jumpFile(delta: number) {
   if (first) app.focusedHunk = first.id;
 }
 
+/** Scrolls the file block after `block` to the top (under the step header) and focuses its first hunk. */
+export function showNextFile(block: HTMLElement | undefined) {
+  requestAnimationFrame(() => {
+    const blocks = [...document.querySelectorAll<HTMLElement>('.file-block')];
+    const next = block ? blocks[blocks.indexOf(block) + 1] : undefined;
+    if (!next) return;
+    scroller()?.scrollTo({ top: next.offsetTop - headHeight(), behavior: 'smooth' });
+    const first = app.viewHunks.find((h) => h.path === next.dataset.path);
+    if (first) app.focusedHunk = first.id;
+  });
+}
+
+/** Brings a file of the step on screen to the top (unfolded) and focuses its first hunk. */
+export function scrollToFile(path: string) {
+  setCollapsed(path, false);
+  requestAnimationFrame(() => {
+    const block = document.querySelector<HTMLElement>(`.file-block[data-path="${CSS.escape(path)}"]`);
+    if (block) scroller()?.scrollTo({ top: block.offsetTop - headHeight(), behavior: 'smooth' });
+    const first = app.viewHunks.find((h) => h.path === path);
+    if (first) app.focusedHunk = first.id;
+  });
+}
+
 export function toggleCurrentFile() {
   const blocks = [...document.querySelectorAll<HTMLElement>('.file-block')];
   const path = blocks[currentIndex(blocks)]?.dataset.path;

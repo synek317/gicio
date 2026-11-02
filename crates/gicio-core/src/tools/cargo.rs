@@ -35,7 +35,7 @@ pub async fn cargo_fmt(root: &RepoRoot) -> Result<()> {
 }
 
 pub async fn cargo_clippy_fix(root: &RepoRoot) -> Result<()> {
-    let out = cargo(root, &["clippy", "--fix", "--allow-dirty", "--allow-staged", "--all-targets"]).await?;
+    let out = cargo(root, &["clippy", "--fix", "--allow-dirty", "--allow-staged", "--workspace", "--all-targets"]).await?;
     if !out.status.success() {
         bail!("cargo clippy --fix failed: {}", tail(&out.stderr));
     }
@@ -44,7 +44,7 @@ pub async fn cargo_clippy_fix(root: &RepoRoot) -> Result<()> {
 
 /// Clippy warnings and errors located in the repository.
 pub async fn cargo_clippy(root: &RepoRoot) -> Result<Vec<ClippyDiagnostic>> {
-    let out = cargo(root, &["clippy", "--all-targets", "--message-format=json"]).await?;
+    let out = cargo(root, &["clippy", "--workspace", "--all-targets", "--message-format=json"]).await?;
     let mut found = Vec::new();
     for line in String::from_utf8_lossy(&out.stdout).lines() {
         let Ok(v) = serde_json::from_str::<Value>(line) else { continue };

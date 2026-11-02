@@ -2,16 +2,20 @@ import { intraLine } from './intraline';
 import { keyOf } from './keys';
 import type { DiffLine, Hunk, LineKind, Side } from './types';
 
-export interface Cell { side: Side; no: number; text: string; kind: LineKind; key: string | null; hl?: [number, number][] }
+/** `block`: keys of the run of changed lines this line belongs to, accepted together from the gutter. */
+export interface Cell { side: Side; no: number; text: string; kind: LineKind; key: string | null; hl?: [number, number][]; block?: string[] }
 export interface UnifiedRow { cell: Cell; oldNo: number | null; newNo: number | null }
 export interface SplitRow { left: Cell | null; right: Cell | null }
 
 function cellsOf(h: Hunk) {
-  return h.lines.map((l) => {
+  let block: string[] = [];
+  return h.lines.map((l, i) => {
     const side: Side = l.kind === 'removed' ? 'old' : 'new';
     const no = (side === 'old' ? l.oldNo : l.newNo) ?? 0;
     const key = l.kind === 'context' ? null : keyOf(h.path, side, no);
-    return { line: l, cell: { side, no, text: l.text, kind: l.kind, key } as Cell };
+    if (key && (i === 0 || h.lines[i - 1].kind === 'context')) block = [];
+    if (key) block.push(key);
+    return { line: l, cell: { side, no, text: l.text, kind: l.kind, key, block: key ? block : undefined } as Cell };
   });
 }
 

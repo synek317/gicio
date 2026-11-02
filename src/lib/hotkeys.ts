@@ -1,5 +1,5 @@
 import { api } from './api';
-import { acceptRestAndNext, back, editFocused, forward, go, markTarget, moveChunk, moveFocus, nextPendingChunk, openAiTask, openComposer, run } from './actions';
+import { acceptRestAndNext, back, closeEditor, editFocused, focusChat, forward, go, markTarget, moveChunk, moveFocus, nextPendingChunk, openComposer, run } from './actions';
 import { settings } from './app-settings.svelte';
 import { jumpFile, toggleCurrentFile } from './files-nav';
 import { comboOf, type ActionId } from './keymap';
@@ -19,19 +19,18 @@ const handlers: Record<ActionId, () => void> = {
   reset: () => markTarget(null),
   acceptRest: () => acceptRestAndNext(),
   comment: () => openComposer(),
-  aiTask: () => openAiTask(),
   rename: () => {
     if (app.pointerCode) app.rename = { ...app.pointerCode };
     else app.toast('Point at a symbol (rust-analyzer running) and press F2, or right-click it.');
   },
-  openFile: () => editFocused(),
+  edit: () => editFocused(),
   toggleLayout: () => (app.layout = app.layout === 'split' ? 'unified' : 'split'),
   laterView: () => go({ kind: 'later' }),
   undo: () => run(api.undo()),
   reload: () => run(api.refresh()),
   back: () => back(),
   forward: () => forward(),
-  chat: () => (app.rightTab = 'chat'),
+  chat: () => focusChat(),
   settings: () => (settings.open = true),
   help: () => (app.showHelp = !app.showHelp),
 };
@@ -53,11 +52,15 @@ export function handleKey(e: KeyboardEvent) {
     if (app.menu) app.menu = null;
     else if (app.showHelp) app.showHelp = false;
     else if (app.composer) app.composer = null;
+    else if (app.editing) closeEditor();
     else app.selection = [];
     return;
   }
   const combo = comboOf(e);
   if (!combo) return;
+  // While typing, arrows (with any modifier) move the cursor, and keys a text field or the editor
+  // already handled (e.g. ⌘[ outdents in the editor) are theirs.
+  if (typing && (combo.includes('arrow') || e.defaultPrevented)) return;
   const action = actionFor(combo);
   if (!action) return;
   if (action === 'settings') {

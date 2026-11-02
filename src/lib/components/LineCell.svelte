@@ -36,6 +36,20 @@
   // A finding box is shown once, on its first line.
   const findingsHere = $derived(findings.filter((f) => f.line === cell?.no));
 
+  /** The bar at the left of a block of changed lines accepts the whole block (or takes it back). */
+  const blockOpen = $derived(cell?.block?.filter((k) => app.marks.get(k) !== 'accepted') ?? []);
+  function blockHover(on: boolean) {
+    app.hoverBlock = on ? (cell?.block?.[0] ?? null) : null;
+    if (on) previewOn(blockOpen);
+    else previewOff();
+  }
+  function acceptBlock(e: MouseEvent) {
+    e.stopPropagation();
+    if (!cell?.block) return;
+    markKeys(blockOpen.length ? blockOpen : cell.block, blockOpen.length ? 'accepted' : null, false);
+    previewOff();
+  }
+
   function click(e: MouseEvent) {
     if (cell && (e.metaKey || e.ctrlKey) && cell.side === 'new') {
       e.preventDefault();
@@ -52,6 +66,17 @@
     class:selected
     data-line="{path}|{cell.side}|{cell.no}"
   >
+    {#if cell.block}
+      <button
+        class="block-bar"
+        class:hot={app.hoverBlock === cell.block[0]}
+        onmouseenter={() => blockHover(true)}
+        onmouseleave={() => blockHover(false)}
+        onclick={acceptBlock}
+        title={blockOpen.length ? `Accept this block (${cell.block.length} lines)` : 'Block accepted — click to make it pending again'}
+        aria-label="Accept block"
+      ></button>
+    {/if}
     <Gutter {cell} {oldNo} {newNo} {status} {unified} />
     <span class="tmark">
       {#if findingsHere.length}

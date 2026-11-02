@@ -42,6 +42,6 @@ export async function exportReview() {
   }
 }
 
-export async function submitReview() {
-  if (await run(api.submitReview())) app.toast('Review submitted: the AI is working through your comments.');
+export async function resolveLater() {
+  if (await run(api.resolveLater())) app.toast('The AI is working through everything you left for later.');
 }

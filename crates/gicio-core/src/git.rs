@@ -1,6 +1,6 @@
 //! Thin wrappers around the `git` CLI.
 
-use crate::domain::{CommitId, FilePath, GitRef, RepoRoot};
+use crate::domain::{CommitId, FilePath, GitRef, RepoRoot, TreeId};
 use crate::process::sync_command;
 use anyhow::{bail, Context, Result};
 use std::path::{Path, PathBuf};
@@ -31,6 +31,15 @@ fn git_with_input(dir: &Path, args: &[&str], input: &[u8]) -> Result<Vec<u8>> {
         .context("failed to run git")?;
     child.stdin.take().context("no stdin")?.write_all(input)?;
     let out = child.wait_with_output()?;
+    if !out.status.success() {
+        bail!("git {}: {}", args.join(" "), String::from_utf8_lossy(&out.stderr).trim());
+    }
+    Ok(out.stdout)
+}
+
+/// `git` with its own index file, so the real index (and what is staged) stays untouched.
+fn git_with_index(dir: &Path, index: &Path, args: &[&str]) -> Result<Vec<u8>> {
+    let out = sync_command("git").arg("-C").arg(dir).args(args).env("GIT_INDEX_FILE", index).output().context("failed to run git")?;
     if !out.status.success() {
         bail!("git {}: {}", args.join(" "), String::from_utf8_lossy(&out.stderr).trim());
     }
@@ -174,4 +183,31 @@ pub fn worktree_fingerprint(root: &RepoRoot, base: &CommitId) -> Result<u64> {
         }
     }
     Ok(h)
+}
+
+/// Records the whole working tree (tracked and untracked, minus ignored files) as a tree object,
+/// without touching the index. Starts from a copy of the index, so unchanged files are not re-read.
+pub fn worktree_tree(root: &RepoRoot) -> Result<TreeId> {
+    static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let dir = git_dir(root)?;
+    let n = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let index = dir.join(format!("gicio-snapshot-{}-{n}.index", std::process::id()));
+    let real = dir.join("index");
+    if real.exists() {
+        std::fs::copy(&real, &index).context("cannot copy the git index")?;
+    }
+    let tree = git_with_index(root.path(), &index, &["add", "-A", "--", "."]).and_then(|_| git_with_index(root.path(), &index, &["write-tree"]));
+    let _ = std::fs::remove_file(&index);
+    TreeId::new(&String::from_utf8(tree?)?)
+}
+
+/// Files that differ between two snapshots.
+pub fn changed_between(root: &RepoRoot, a: &TreeId, b: &TreeId) -> Result<Vec<FilePath>> {
+    let out = git(root.path(), &["diff-tree", "-r", "--no-renames", "--name-only", "-z", a.as_str(), b.as_str()])?;
+    Ok(out.split(|b| *b == 0).filter(|n| !n.is_empty()).filter_map(|n| FilePath::new(&String::from_utf8_lossy(n)).ok()).collect())
+}
+
+/// `path` in a snapshot as it would look on disk; `None` when the snapshot has no such file.
+pub fn tree_file(root: &RepoRoot, tree: &TreeId, path: &FilePath) -> Option<Vec<u8>> {
+    git(root.path(), &["cat-file", "--filters", &format!("{}:{}", tree.as_str(), path.as_str())]).ok()
 }

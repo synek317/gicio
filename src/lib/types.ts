@@ -11,24 +11,30 @@ export interface FileDiff { path: string; oldPath: string | null; status: FileSt
 export interface HunkRef { id: string; path: string; oldStart: number; oldLen: number; part: HunkPart | null }
 export type ChunkOrigin = { kind: 'fallback' } | { kind: 'ai' } | { kind: 'followUp'; thread: string | null };
 export interface Note { path: string; side: Side; line: number; text: string; outdated?: boolean }
-export interface Chunk { id: string; title: string; summary: string; hunks: HunkRef[]; origin: ChunkOrigin; notes: Note[] }
+/** `group`: the feature the step belongs to; consecutive steps of one feature are shown nested. */
+export interface Chunk { id: string; title: string; summary: string; hunks: HunkRef[]; origin: ChunkOrigin; notes: Note[]; group?: string | null }
 export interface LineKey { path: string; side: Side; line: number }
 export interface Mark extends LineKey { text: string; status: MarkStatus }
 export interface AnchorInput { path: string; side: Side; start: number; end: number }
 export interface Anchor extends AnchorInput { excerpt: string; outdated?: boolean }
 export type Author = { kind: 'human' } | { kind: 'ai'; backend: string } | { kind: 'system' };
-export interface Message { author: Author; kind: 'text' | 'error' | 'codeChanged'; body: string; at: number; pending?: boolean }
-export interface Thread { id: string; chunk: string | null; anchor: Anchor | null; status: ThreadStatus; allowEdits: boolean; todo: boolean; messages: Message[]; busy: boolean }
+/** `change`: for a "code changed" note, the AI change it reports. */
+export interface Message { author: Author; kind: 'text' | 'error' | 'codeChanged'; body: string; at: number; change?: string }
+export type ChangeStatus = 'pending' | 'accepted' | 'rejected';
+/** What one AI job (or tool) changed in the working tree, to look at and keep or undo. */
+export interface AgentChange { id: string; title: string; by: string; thread: string | null; files: string[]; status: ChangeStatus }
+export interface Thread { id: string; chunk: string | null; anchor: Anchor | null; status: ThreadStatus; allowEdits: boolean; messages: Message[]; busy: boolean }
 
 export type BackendKind = 'claude' | 'codex' | 'copilot' | 'custom';
 export type Engine = { kind: 'claude' | 'codex' | 'copilot' } | { kind: 'custom'; command: string };
 export type Effort = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 export interface AiBackend { engine: Engine; model: string | null; effort: Effort | null; language: string }
 export interface InstructionFile { path: string; kind: string; skill: [string, string] | null; native: boolean }
-export type JobKind = 'ask' | 'todo' | 'plan' | 'chat' | 'summary' | 'review' | 'aiReview' | 'fix' | 'commit' | 'tool';
+export type JobKind = 'ask' | 'plan' | 'chat' | 'summary' | 'review' | 'aiReview' | 'fix' | 'commit' | 'tool';
 export type JobStatus = 'queued' | 'running' | 'done' | 'failed' | 'cancelled';
 export interface JobInfo { id: string; kind: JobKind; status: JobStatus; title: string; thread: string | null; log: string[] }
-export type SendMode = 'note' | 'ask' | 'todo' | 'review';
+/** `ask`: the AI answers now; `later`: left for the "resolve later" step. */
+export type SendMode = 'ask' | 'later';
 export type StageMode = 'memory' | 'index';
 export interface DiffOptions { ignoreWhitespace: boolean }
 export type Severity = 'error' | 'warning' | 'info';
@@ -50,6 +56,7 @@ export interface Snapshot {
   threads: Thread[];
   chat: Message[];
   findings: Finding[];
+  changes: AgentChange[];
   diffOptions: DiffOptions;
   stageMode: StageMode;
   summary: Message | null;

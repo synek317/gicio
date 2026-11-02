@@ -1,5 +1,5 @@
 use crate::diff::Side;
-use crate::domain::{ChunkId, FilePath, ThreadId};
+use crate::domain::{ChangeId, ChunkId, FilePath, ThreadId};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 pub enum ThreadStatus {
     Open,
     Resolved,
+    /// Left for later: the AI takes all of these in one go in the "resolve later" step.
     Deferred,
 }
 
@@ -47,15 +48,19 @@ pub struct Message {
     pub kind: MessageKind,
     pub body: String,
     pub at: u64,
-    /// A reviewer comment waiting for "Submit review".
-    #[serde(default)]
-    pub pending: bool,
+    /// For a "code changed" note: the AI change it reports, to look at, keep or undo.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub change: Option<ChangeId>,
 }
 
 impl Message {
     pub fn new(author: Author, kind: MessageKind, body: impl Into<String>) -> Self {
         let at = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
-        Self { author, kind, body: body.into(), at, pending: false }
+        Self { author, kind, body: body.into(), at, change: None }
+    }
+
+    pub fn with_change(self, change: Option<ChangeId>) -> Self {
+        Self { change, ..self }
     }
 }
 
@@ -67,9 +72,6 @@ pub struct Thread {
     pub anchor: Option<Anchor>,
     pub status: ThreadStatus,
     pub allow_edits: bool,
-    /// Created as a background to-do for the AI.
-    #[serde(default)]
-    pub todo: bool,
     pub messages: Vec<Message>,
     #[serde(default)]
     pub busy: bool,

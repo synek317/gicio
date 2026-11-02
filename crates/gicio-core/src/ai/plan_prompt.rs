@@ -43,19 +43,20 @@ pub fn build_plan_prompt(input: &PlanPromptInput) -> String {
 Repository: {repo}
 The change under review = the working tree compared to base commit {sha} ({base_ref}).
 
-Split the hunks listed below into review chunks and order them.
+Split the hunks listed below into features, each feature into review chunks, and order them.
 
 Rules:
-- A chunk is one concern a careful reviewer can digest in about 5 minutes (typically 20-150 changed lines). Split unrelated changes in one file into different chunks when it helps; group related hunks across files.
-- Order chunks so understanding builds up: data types and interfaces first, then core logic, then call sites and wiring, then tests, docs, config, generated or mechanical changes (renames, formatting) last.
+- A feature is one piece of functionality (a new capability, a bug fix, a refactoring, a dependency bump…). If the change contains several features, give each its own entry so the reviewer goes through one feature at a time; never mix two features in one chunk. A change that is really one feature is a single entry.
+- A chunk is one concern a careful reviewer can digest in about 5 minutes (typically 20-150 changed lines). A small feature is one chunk; a large one is split into several chunks. Split unrelated changes in one file into different chunks when it helps; group related hunks across files.
+- Order features so that ones others build on come first. Within a feature, order chunks so understanding builds up: data types and interfaces first, then core logic, then call sites and wiring, then tests, docs, config. Generated or mechanical changes (renames, formatting) go last, as their own feature.
 - Every hunk must be covered. A large hunk that mixes separate concerns (e.g. a new file with several unrelated items) may be split across chunks with row ranges like "H3:1-40" and "H3:41-90" (rows are numbered at the left of each hunk). Split only at natural boundaries such as between functions or items, never inside one.
-- "title": at most ~8 words. "summary": 1-4 sentences saying what the chunk does and what the reviewer should check (risks, invariants, edge cases).
+- Feature and chunk "title": at most ~8 words. "summary": 1-4 sentences saying what the chunk does and what the reviewer should check (risks, invariants, edge cases).
 - Write titles and summaries in {language}.
 - Optionally add "notes": short explanations for spots where a reviewer would likely wonder "why?" (a non-obvious invariant, a subtle fix, a surprising API choice). Attach each to a row: {{"at":"H3:12","text":"..."}}. Most chunks need none; never restate what the code plainly says.
 - You may read repository files for context, but do not modify anything.
 {instructions}{kept}
 Respond with ONLY a JSON object, no prose:
-{{"chunks":[{{"title":"...","summary":"...","hunks":["H1","H2:1-30"],"notes":[{{"at":"H2:12","text":"..."}}]}}]}}
+{{"features":[{{"title":"...","chunks":[{{"title":"...","summary":"...","hunks":["H1","H2:1-30"],"notes":[{{"at":"H2:12","text":"..."}}]}}]}}]}}
 
 Hunks:
 

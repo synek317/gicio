@@ -8,7 +8,8 @@ export type View =
   | { kind: 'later' }
   | { kind: 'file'; path: string }
   | { kind: 'source'; title: string; absPath: string; repoPath: string | null; line: number | null }
-  | { kind: 'refs'; title: string; locs: SourceLocation[] };
+  | { kind: 'refs'; title: string; locs: SourceLocation[] }
+  | { kind: 'change'; id: string };
 export interface HistoryEntry { view: View; scroll: number }
 export interface Toast { id: number; text: string; kind: 'info' | 'error' }
 export interface HoverInfo { x: number; y: number; text: string }
@@ -23,15 +24,25 @@ class AppState {
   layout = $state<'split' | 'unified'>('split');
   selection = $state<string[]>([]);
   selAnchor = $state<string | null>(null);
+  /** The line the selection was last extended to, where the pointer is; the popover sits there. */
+  selHead = $state<string | null>(null);
   focusedHunk = $state<string | null>(null);
   /** Text to prefill the next composer with (e.g. from a finding). */
   composerDraft = $state('');
-  /** `task`: a review-wide job for the AI rather than a comment on lines. */
-  composer = $state<{ anchor: AnchorInput | null; chunk: string | null; task?: boolean } | null>(null);
+  /** A new conversation about lines or a step (the whole change has its own card). */
+  composer = $state<{ anchor: AnchorInput | null; chunk: string | null } | null>(null);
   activeThread = $state<string | null>(null);
-  sidebarTab = $state<'queue' | 'files' | 'later'>('queue');
-  showAllThreads = $state(false);
-  rightTab = $state<'discussions' | 'chat' | 'findings'>('discussions');
+  /** Bumped to open the whole-change conversation and put the cursor in it. */
+  chatFocus = $state(0);
+  /** Which conversation history the panel shows: what is on screen (the step) or the whole change. */
+  convScope = $state<'here' | 'whole'>('here');
+  /** Bumped to put the cursor in the question box next to the selection. */
+  selectionFocus = $state(0);
+  /** Hunk (view id) being edited in place; the editor opens at `line` (new side), which was `offset`
+   *  pixels below the top of the diff scroller, so the code stays where it was on screen. */
+  editing = $state<{ hunk: string; line: number | null; offset: number | null } | null>(null);
+  sidebarTab = $state<'steps' | 'files'>('steps');
+  rightTab = $state<'conversations' | 'findings'>('conversations');
   showHelp = $state(false);
   lsp = $state<LspStatus>({ state: 'off' });
   toasts = $state<Toast[]>([]);
@@ -44,6 +55,8 @@ class AppState {
   fileRev = $state(0);
   /** Code position under the pointer (for F2 rename in the diff). */
   pointerCode: { path: string; line: number; character: number } | null = null;
+  /** First key of the block of changed lines whose accept bar is under the pointer. */
+  hoverBlock = $state<string | null>(null);
   /** Lines an accept button under the pointer would accept. */
   preview = $state<Set<string>>(new Set());
   /** A file where only blank lines are left unaccepted, waiting for the user's answer. */
@@ -85,8 +98,8 @@ class AppState {
     const m = new Map<string, Thread[]>();
     for (const t of this.snap?.threads ?? []) {
       const a = t.anchor;
-      // A discussion whose code is gone has no place in the code any more.
-      if (!a || a.outdated) continue;
+      // A conversation whose code is gone, or that is resolved, has no place in the code any more.
+      if (!a || a.outdated || t.status === 'resolved') continue;
       for (let l = a.start; l <= a.end; l++) {
         const k = `${a.path}|${a.side}|${l}`;
         m.set(k, [...(m.get(k) ?? []), t]);
@@ -108,10 +121,28 @@ class AppState {
     return m;
   });
 
+  /** The step being reviewed: the one on screen, else the last one visited (e.g. while a file is open). */
+  stepId = $derived.by((): string | null => {
+    const v = this.view;
+    if (v?.kind === 'chunk') return v.id;
+    for (const h of this.history.toReversed()) if (h.view.kind === 'chunk') return h.view.id;
+    return null;
+  });
+  /** Files of that step. */
+  stepPaths = $derived.by(() => {
+    const c = this.stepId ? this.chunk(this.stepId) : undefined;
+    return new Set(c ? this.chunkHunks(c).map((h) => h.path) : []);
+  });
+
   /** The topmost file of the view that is on screen; the file tree follows it. */
   currentFile = $derived(this.viewHunks.map((h) => h.path).find((p) => this.onScreen[p]) ?? null);
 
-  pendingReview = $derived((this.snap?.threads ?? []).filter((t) => t.messages.some((m) => m.pending)).length);
+  /** AI changes waiting for the reviewer to keep or undo them. */
+  pendingChanges = $derived((this.snap?.changes ?? []).filter((c) => c.status === 'pending'));
+  /** Conversations left for the "resolve later" step. */
+  laterThreads = $derived((this.snap?.threads ?? []).filter((t) => t.status === 'deferred'));
+  /** Anything put off: lines or conversations. */
+  hasLater = $derived(this.overall.deferred > 0 || this.laterThreads.length > 0);
 
   /** `${path}|${side}|${line}` -> AI notes from the plan. */
   noteLines = $derived.by(() => {
@@ -146,6 +177,11 @@ class AppState {
     if (this.view?.kind === 'chunk' && !this.chunk(this.view.id)) this.view = s.chunks[0] ? { kind: 'chunk', id: s.chunks[0].id } : null;
     if (!this.view && s.chunks[0]) this.view = { kind: 'chunk', id: s.chunks[0].id };
     if (this.focusedHunk && !this.viewHunkMap.has(this.focusedHunk)) this.focusedHunk = null;
+    // The code under an in-place editor changed (an edit elsewhere, the AI): its region is gone.
+    if (this.editing && !this.viewHunkMap.has(this.editing.hunk)) {
+      this.editing = null;
+      this.editorDirty = false;
+    }
     const live = new Set(this.orderedKeys);
     if (this.selection.some((k) => !live.has(k))) this.selection = this.selection.filter((k) => live.has(k));
   }

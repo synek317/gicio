@@ -8,6 +8,7 @@
   const MOUSE = [
     ['click gutter', 'select a line; shift-click range; ⌘-click toggle; drag to select'],
     ['click • / ✓', 'toggle one line accepted / pending'],
+    ['click the bar left of a block', 'accept the whole block of changed lines'],
     ['⌘-click code', 'go to definition'],
     ['right-click code', 'definition, references, open file, ask AI'],
     ['Esc', 'clear selection / close'],

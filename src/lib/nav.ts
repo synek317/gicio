@@ -15,8 +15,9 @@ function show(view: View, scroll = 0) {
 }
 
 function leaveEditor(): boolean {
-  if (app.view?.kind === 'source' && app.editorDirty && !window.confirm('Discard unsaved edits?')) return false;
+  if ((app.view?.kind === 'source' || app.editing) && app.editorDirty && !window.confirm('Discard unsaved edits?')) return false;
   app.editorDirty = false;
+  app.editing = null;
   return true;
 }
 

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { editFile, markKeys, openComposer, selectLine } from '../actions';
+  import { editLine, markKeys, openComposer, selectionAnchor, selectLine } from '../actions';
   import { itemsAround } from '../item-keys';
   import { itemLabel } from '../items';
   import { previewOff, previewOn } from '../preview';
@@ -31,6 +31,14 @@
     }
   }
 
+  const selected = $derived(app.selSet.has(keyOf(m.path, m.side, m.line)) && app.selection.length > 1);
+
+  /** The selected lines when the click is inside the selection, else just this line. */
+  function reviewHere() {
+    const a = selected ? selectionAnchor() : null;
+    reviewWithAi(a ? { kind: 'lines', ...a } : { kind: 'lines', path: m.path, side: m.side, start: m.line, end: m.line });
+  }
+
   function ask() {
     if (inDiff && !app.selSet.has(keyOf(m.path, m.side, m.line))) selectLine(keyOf(m.path, m.side, m.line), 'set');
     openComposer(inDiff);
@@ -50,10 +58,10 @@
       {/each}
     {/if}
     <hr />
-    <button disabled={m.side !== 'new'} onclick={() => act(() => editFile(m.path, m.line))}>Edit here <kbd>e</kbd></button>
+    <button disabled={m.side !== 'new'} onclick={() => act(() => editLine(m.path, m.line))}>Edit here <kbd>e</kbd></button>
     {#if app.view?.kind === 'chunk' || app.view?.kind === 'file' || app.view?.kind === 'later'}
-      <button onclick={() => act(ask)}>Ask AI about this…</button>
-      <button onclick={() => act(() => reviewWithAi({ kind: 'lines', path: m.path, side: m.side, start: m.line, end: m.line }))}>AI review this line</button>
+      <button onclick={() => act(ask)}>New conversation… <kbd>c</kbd></button>
+      <button onclick={() => act(reviewHere)}>AI review {selected ? 'the selection' : 'this line'}</button>
     {/if}
     {#if !lsp && m.side === 'new' && m.path.endsWith('.rs')}<div class="muted small menu-note">rust-analyzer: {app.lsp.state}</div>{/if}
   </div>

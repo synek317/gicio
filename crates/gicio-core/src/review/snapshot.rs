@@ -19,6 +19,7 @@ pub struct Snapshot {
     pub threads: Vec<Thread>,
     pub chat: Vec<Message>,
     pub findings: Vec<super::Finding>,
+    pub changes: Vec<super::AgentChange>,
     pub summary: Option<Message>,
     pub chat_busy: bool,
     pub summary_busy: bool,

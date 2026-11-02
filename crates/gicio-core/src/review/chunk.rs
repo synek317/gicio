@@ -108,6 +108,9 @@ pub struct Chunk {
     pub origin: ChunkOrigin,
     #[serde(default)]
     pub notes: Vec<Note>,
+    /// The feature this step belongs to; consecutive steps of one feature are shown nested.
+    #[serde(default)]
+    pub group: Option<String>,
 }
 
 /// One entry of a planned chunk: a whole hunk or a line range of it.
@@ -124,4 +127,5 @@ pub struct PlannedChunk {
     pub summary: String,
     pub items: Vec<PlannedItem>,
     pub notes: Vec<Note>,
+    pub group: Option<String>,
 }

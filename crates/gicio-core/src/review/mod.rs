@@ -1,3 +1,4 @@
+mod agent_change;
 mod anchors;
 mod chunk;
 mod coverage;
@@ -7,12 +8,14 @@ mod fallback_plan;
 mod marks;
 mod reconcile;
 mod session;
+mod session_changes;
 mod session_findings;
 mod signature;
 mod snapshot;
 mod state;
 mod thread;
 
+pub use agent_change::{AgentChange, ChangeStatus};
 pub use anchors::locate;
 pub use chunk::{Chunk, ChunkOrigin, HunkPart, HunkRef, Note, PlannedChunk, PlannedItem};
 pub use coverage::Coverage;

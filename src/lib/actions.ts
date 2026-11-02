@@ -1,4 +1,5 @@
-import { api, inTauri } from './api';
+import { api } from './api';
+import { confirm } from './confirm';
 import { settings } from './app-settings.svelte';
 import { changedKeys, parseKey } from './keys';
 import { hunkProgress } from './progress';
@@ -8,7 +9,7 @@ import { afterAccept } from './blank-lines';
 import { previewOff } from './preview';
 export { scrollToLine } from './scroll';
 import { app } from './state.svelte';
-import type { AnchorInput, MarkStatus, SendMode, Snapshot } from './types';
+import type { AnchorInput, Hunk, MarkStatus, SendMode, Snapshot } from './types';
 
 export async function run(p: Promise<Snapshot>): Promise<boolean> {
   try {
@@ -87,8 +88,8 @@ export function nextPendingChunk() {
   const order = [...cs.slice(i + 1), ...cs.slice(0, Math.max(i, 0))];
   const next = order.find((c) => app.chunkProgress(c).pending > 0);
   if (next) go({ kind: 'chunk', id: next.id });
-  else if (app.overall.deferred > 0) {
-    app.toast('Queue done. Showing items you put off for later.');
+  else if (app.hasLater) {
+    app.toast('All steps done. Showing what you left for later.');
     go({ kind: 'later' });
   } else app.toast('Everything is reviewed 🎉');
 }
@@ -96,6 +97,7 @@ export function nextPendingChunk() {
 /** Selection by gutter: plain click starts, shift extends, cmd toggles. */
 export function selectLine(key: string, mode: 'set' | 'extend' | 'toggle') {
   const order = app.orderedKeys;
+  app.selHead = key;
   if (mode === 'toggle') {
     app.selection = app.selSet.has(key) ? app.selection.filter((k) => k !== key) : [...app.selection, key];
     app.selAnchor = key;
@@ -126,31 +128,67 @@ function currentAnchor(): AnchorInput | null {
   return { path: h.path, side: 'old', start: h.oldStart, end: h.oldStart + Math.max(h.oldLen, 1) - 1 };
 }
 
+/** The step on screen, which new conversations belong to. */
+const stepOnScreen = () => (app.view?.kind === 'chunk' ? app.view.id : null);
+
+/** A new conversation about the selected lines (in the box next to them), the focused hunk,
+ *  else the current step, else the whole change. */
 export function openComposer(anchored = true) {
-  const v = app.view;
-  app.rightTab = 'discussions';
-  app.composer = { anchor: anchored ? currentAnchor() : null, chunk: v?.kind === 'chunk' ? v.id : null };
+  if (anchored && app.selection.length) {
+    app.selectionFocus++;
+    return;
+  }
+  const anchor = anchored ? currentAnchor() : null;
+  const chunk = stepOnScreen();
+  if (!anchor && !chunk) return focusChat();
+  app.rightTab = 'conversations';
+  app.convScope = 'here';
+  app.composer = { anchor, chunk };
 }
 
-/** A review-wide task for the AI, not tied to lines or a step. */
-export function openAiTask() {
-  app.rightTab = 'discussions';
-  app.composer = { anchor: null, chunk: null, task: true };
+/** Opens the conversation about the whole change. */
+export function focusChat() {
+  app.rightTab = 'conversations';
+  app.convScope = 'whole';
+  app.composer = null;
+  app.chatFocus++;
 }
 
-export async function startThread(body: string, mode: SendMode, allowEdits: boolean) {
-  const c = app.composer;
-  if (!c || !body.trim()) return;
+/** Shows the history a conversation belongs to: the whole change, or what is on screen. */
+export function showConversation(t: { id: string; chunk: string | null; anchor: AnchorInput | null }) {
+  app.activeThread = t.id;
+  app.rightTab = 'conversations';
+  app.convScope = !t.chunk && !t.anchor ? 'whole' : 'here';
+}
+
+const LATER_TOAST = 'Left for later. It waits in the last step, “Resolve issues left for later”.';
+
+/** Starts a conversation about `anchor` (lines) in `chunk` (a step); both null: the whole change. */
+export async function startConversation(chunk: string | null, anchor: AnchorInput | null, mode: SendMode, body: string, allowEdits: boolean) {
+  if (!body.trim()) return;
   try {
-    const id = await api.createThread(c.chunk, c.anchor, allowEdits, mode === 'todo');
-    app.composer = null;
-    app.activeThread = id;
-    app.selection = [];
-    await run(api.sendMessage(id, body, mode, null));
-    if (mode === 'todo') app.toast('Added to the AI to-do list. Its changes will appear at the end of the queue.');
+    const id = await api.createThread(chunk, anchor, allowEdits);
+    showConversation({ id, chunk, anchor });
+    if ((await run(api.sendMessage(id, body, mode, null))) && mode === 'later') app.toast(LATER_TOAST);
   } catch (e) {
     app.toast(String(e), 'error');
   }
+}
+
+/** Sends what was typed in the composer of the conversations panel. */
+export async function startThread(mode: SendMode, body: string, allowEdits: boolean) {
+  const c = app.composer;
+  if (!c) return;
+  app.composer = null;
+  await startConversation(c.chunk, c.anchor, mode, body, allowEdits);
+}
+
+/** Sends what was typed in the box next to the selected lines. */
+export async function askAboutSelection(mode: SendMode, body: string, allowEdits: boolean) {
+  const anchor = currentAnchor();
+  if (!anchor) return;
+  app.selection = [];
+  await startConversation(stepOnScreen(), anchor, mode, body, allowEdits);
 }
 
 export async function plan(replan: boolean) {
@@ -163,7 +201,7 @@ export async function plan(replan: boolean) {
 
 
 export function revealThread(t: { id: string; chunk: string | null; anchor: AnchorInput | null }) {
-  app.activeThread = t.id;
+  showConversation(t);
   const a = t.anchor;
   if (t.chunk && app.chunk(t.chunk) && !(app.view?.kind === 'chunk' && app.view.id === t.chunk)) go({ kind: 'chunk', id: t.chunk });
   if (a && !(a as { outdated?: boolean }).outdated) setTimeout(() => scrollToLine(a.path, a.side, a.start), 60);
@@ -172,8 +210,7 @@ export function revealThread(t: { id: string; chunk: string | null; anchor: Anch
 /** Throws away all progress for this review and starts again. */
 export async function startOver() {
   const msg = 'Start this review over? All accepted/later marks, the queue and discussions are discarded. Code is not touched.';
-  const ok = !settings.value.prefs.confirmStartOver ? true : inTauri ? await (await import('@tauri-apps/plugin-dialog')).ask(msg, { title: 'Start over', kind: 'warning' }) : window.confirm(msg);
-  if (!ok) return;
+  if (settings.value.prefs.confirmStartOver && !(await confirm(msg, 'Start over'))) return;
   if (!(await run(api.resetReview()))) return;
   app.history = [];
   app.future = [];
@@ -209,9 +246,43 @@ export function selectionAnchor(): AnchorInput | null {
   return currentAnchor();
 }
 
+/** Closes the in-place editor; unsaved changes are discarded only after asking. */
+export async function closeEditor(): Promise<boolean> {
+  if (app.editing && app.editorDirty && !(await confirm('Discard changes?'))) return false;
+  app.editorDirty = false;
+  app.editing = null;
+  return true;
+}
+
+/** Where the cursor goes when editing a hunk: the line under the pointer, else its first added line. */
+function editTarget(h: Hunk): number | null {
+  const news = h.lines.filter((l) => l.newNo != null);
+  const p = app.pointerCode;
+  if (p && p.path === h.path && news.some((l) => l.newNo === p.line)) return p.line;
+  return (news.find((l) => l.kind === 'added') ?? news[0])?.newNo ?? null;
+}
+
+/** Edits a hunk right in the diff, with the cursor on `line` (default: see `editTarget`). */
+export async function editHunk(id: string, line: number | null = null) {
+  const h = app.viewHunkMap.get(id);
+  if (!h || app.files.get(h.path)?.status === 'deleted') return;
+  if (app.editing?.hunk !== id && !(await closeEditor())) return;
+  const target = line ?? editTarget(h);
+  const row = target == null ? null : document.querySelector(`#hunk-${CSS.escape(id)} [data-line="${CSS.escape(`${h.path}|new|${target}`)}"]`);
+  const top = document.getElementById('diff-scroll')?.getBoundingClientRect().top ?? 0;
+  app.focusedHunk = id;
+  app.editing = { hunk: id, line: target, offset: row ? row.getBoundingClientRect().top - top : null };
+}
+
 export function editFocused() {
-  const v = app.view;
-  if (v?.kind === 'source') return;
+  if (app.view?.kind === 'source') return;
   const h = app.focusedHunk ? app.viewHunkMap.get(app.focusedHunk) : app.viewHunks[0];
-  if (h && app.files.get(h.path)?.status !== 'deleted') editFile(h.path, h.newStart);
+  if (h) editHunk(h.id);
+}
+
+/** Edits the diff line in place when it is on screen, else opens the file at it. */
+export function editLine(path: string, line: number) {
+  const h = app.viewHunks.find((h) => h.path === path && h.lines.some((l) => l.newNo === line));
+  if (h) editHunk(h.id, line);
+  else editFile(path, line);
 }

@@ -29,6 +29,7 @@ export async function mockInvoke(cmd: string, args: Record<string, any> = {}): P
   s.findings ??= [];
   s.diffOptions ??= { ignoreWhitespace: false };
   s.stageMode ??= 'memory';
+  s.changes ??= [];
   const bump = () => ({ ...s, version: ++s.version, canUndo: undo.length > 0 });
   switch (cmd) {
     case 'open_session':
@@ -62,13 +63,21 @@ export async function mockInvoke(cmd: string, args: Record<string, any> = {}): P
       return bump();
     case 'create_thread': {
       const id = `t${s.threads.length + 100}`;
-      s.threads.push({ id, chunk: args.chunk, anchor: args.anchor ? { ...args.anchor, excerpt: '' } : null, status: 'open', allowEdits: args.allowEdits, todo: args.todo, messages: [], busy: false });
+      s.threads.push({ id, chunk: args.chunk, anchor: args.anchor ? { ...args.anchor, excerpt: '' } : null, status: 'open', allowEdits: args.allowEdits, messages: [], busy: false });
       return id;
     }
     case 'send_message': {
       const t = s.threads.find((t) => t.id === args.thread)!;
-      t.messages.push({ author: { kind: 'human' }, kind: 'text', body: args.body, at: Date.now() / 1000, pending: args.mode === 'review' });
-      if (args.mode === 'ask' || args.mode === 'todo') t.messages.push({ author: { kind: 'ai', backend: 'mock' }, kind: 'text', body: 'Mock answer with `code` and\n\n```rust\nfn x() {}\n```', at: Date.now() / 1000 });
+      t.messages.push({ author: { kind: 'human' }, kind: 'text', body: args.body, at: Date.now() / 1000 });
+      t.status = args.mode === 'later' ? 'deferred' : 'open';
+      if (args.mode === 'ask') {
+        t.messages.push({ author: { kind: 'ai', backend: 'mock' }, kind: 'text', body: 'Mock answer with `code` and\n\n```rust\nfn x() {}\n```', at: Date.now() / 1000 });
+        // Pretend the AI edited the first file.
+        const id = `a${s.changes.length + 1}`;
+        const path = s.files[0].path;
+        s.changes.push({ id, title: args.body.slice(0, 60), by: 'mock', thread: t.id, files: [path], status: 'pending' });
+        t.messages.push({ author: { kind: 'system' }, kind: 'codeChanged', body: `Code changed in \`${path}\` (shown right after this step).`, at: Date.now() / 1000, change: id });
+      }
       return bump();
     }
     case 'set_thread_status':
@@ -76,6 +85,9 @@ export async function mockInvoke(cmd: string, args: Record<string, any> = {}): P
       return bump();
     case 'plan_ai':
     case 'replan_ai':
+      // Pretend the AI found two features, the first one in two steps.
+      s.chunks.forEach((c, i) => (c.group = i < 2 ? 'Feature one' : i < 4 ? 'Feature two' : null));
+      s.plannedByAi = true;
       return bump();
     case 'list_jobs':
       return fx.jobs ?? [];
@@ -91,8 +103,22 @@ export async function mockInvoke(cmd: string, args: Record<string, any> = {}): P
     case 'clear_chat':
       s.chat = [];
       return bump();
-    case 'submit_review':
-      s.threads.forEach((t) => t.messages.forEach((m) => (m.pending = false)));
+    case 'change_diff': {
+      const f = s.files[0];
+      const h = f.hunks[0];
+      return [{ ...f, status: 'modified', hunks: [{ ...h, lines: [{ kind: 'removed', oldNo: 4, newNo: null, text: 'use std::fmt;' }, ...h.lines.slice(0, 6)] }] }];
+    }
+    case 'accept_change':
+    case 'reject_change': {
+      const c = s.changes.find((c) => c.id === args.id)!;
+      c.status = cmd === 'accept_change' ? 'accepted' : 'rejected';
+      return cmd === 'accept_change' ? bump() : [bump(), []];
+    }
+    case 'resolve_later':
+      for (const t of s.threads.filter((t) => t.status === 'deferred')) {
+        t.status = 'open';
+        t.messages.push({ author: { kind: 'ai', backend: 'mock' }, kind: 'text', body: 'Mock: resolved.', at: Date.now() / 1000 });
+      }
       return bump();
     case 'export_review':
       return '# Review (mock)';
@@ -124,6 +150,8 @@ export async function mockInvoke(cmd: string, args: Record<string, any> = {}): P
       return bump();
     case 'lsp_symbols':
       return [];
+    case 'ai_models':
+      return args.program === 'claude' ? ['fable', 'opus', 'sonnet'] : [];
     case 'ai_tools':
       return { claude: true, codex: false, copilot: false };
     case 'set_backend':

@@ -39,44 +39,52 @@ So far I have tested it properly only with Claude Code.
 
 Gicio (roughly "GHEE-cho") is a playful, affectionate way to say "all good" in Polish. It comes from git, which in everyday Polish today means "good" or "OK". A change that passes review is gicio - and the name gives a nod to Git, too.
 
-![Reviewing a step planned by the AI, with an AI note, a discussion and background AI activity](docs/screenshots/review.png)
+![Reviewing a step planned by the AI, with an AI note, a conversation and background AI activity](docs/screenshots/review.png)
 
 ## How it works
 
 1. Point gicio at a repository and choose what to review: **uncommitted changes** (staged, unstaged
    and new files) or **everything since a branch or commit** (e.g. an AI's branch against `main`).
-2. The AI reads the whole diff and plans **review steps**: one concern each, ordered so that
-   understanding builds up (types → logic → wiring → tests). A big hunk or a new file can be split across
-   steps. The AI adds short **notes (?)** where a reviewer would likely wonder "why?".
+2. The AI reads the whole diff and plans **review steps**: one feature at a time, a large feature split
+   into several steps (shown nested under it), ordered so that understanding builds up
+   (types → logic → wiring → tests). A big hunk or a new file can be split across steps. The AI adds
+   short **notes (?)** where a reviewer would likely wonder "why?".
 3. You go through the steps. Every changed line is **pending**, **accepted** or **put off for later**.
-   Marks follow the code when the diff moves.
-4. Select lines and **comment**. Each comment is either a note for yourself, a question the AI answers
-   **now**, or an **AI to-do** that runs in the background while you keep reviewing.
+   Marks follow the code when the diff moves. Finished steps stay in the list, struck through and
+   stamped "Done".
+4. Select lines and type your question in the box that appears next to them: **start a conversation**
+   (the AI answers now) or **add it for later**.
+   Everything left for later, lines and conversations, waits in the last step, **Resolve issues left
+   for later**, where the AI can take all of it in one go.
 5. When the AI edits code, gicio re-reads the working tree. Changed hunks stay in their step, and new
-   code becomes a follow-up step (after the current one for answers, at the end of the queue for to-dos).
+   code becomes a follow-up step (after the discussed step, or at the end for issues resolved later).
 
 Nothing is committed, ever. The AI only edits your working tree, and only when you let it.
 
 ## Features
 
 **Reviewing**
-- Queue of AI-planned steps (or plain file by file), with a "Done" list and progress everywhere.
+- One list of AI-planned steps (or plain file by file), grouped by feature, with progress everywhere;
+  finished steps are struck through and stamped "Done".
 - Side-by-side or unified diff (added and deleted files are always unified), with syntax highlighting
   and word-level highlights of what changed inside a line. Whitespace-only changes can be ignored.
 - More context on demand: 20 more lines above or below a hunk, or the whole enclosing function
   (via rust-analyzer, with a guess for other languages).
-- Per-line marks: click the gutter dot to toggle a line, drag in the gutter to select a range, then
-  accept, put off for later or reset, using the keyboard or the floating bar.
+- Per-line marks: click the gutter dot to toggle a line, or the bar at the left of a block of changed
+  lines to accept the whole block. Drag in the gutter to select a range, then put it off for later,
+  reset it or start a conversation about it (keyboard or the floating bar).
 - Accept whole code items at once: a "✓ fn new", "✓ struct Store", "✓ impl …", "✓ use ×4",
   "✓ thread_local!" button sits on each changed item's first line (also in the right-click menu), and
   hunks inside a function offer to accept the enclosing one.
-- "Later" tab: everything you put off, lines and discussions, to come back to at the end.
-- File tree with per-file and per-folder progress. Files currently on screen are highlighted, and
-  the file under your pointer is highlighted more subtly.
+- "Resolve issues left for later": the last step gathers everything you put off, lines and
+  conversations, to come back to at the end.
+- File tree with per-file and per-folder progress. Files of the current step are marked, files currently
+  on screen are highlighted, and the file under your pointer is highlighted more subtly. The selected
+  step also lists its files right under it in the step list.
 - Sticky file bar while scrolling, with one-click "Accept file" / "Accept this part". Accepted files
   collapse, and anything accepted can be taken back ("↺ Unaccept" on a hunk, file or step, also from
-  the Done list). Jump between files with `f` / `Shift+F`.
-- Back / forward navigation (⌘− / ⌘+), undo for marks, "Start over".
+  the step list). Jump between files with `f` / `Shift+F`.
+- Back / forward navigation (⌘− / ⌘+), undo for marks (`z`), "Start over" in the **Review** menu.
 
 **From review to commit**
 - Optionally **stage what you accept**. Accepted lines go to the git index, including parts of files,
@@ -86,17 +94,22 @@ Nothing is committed, ever. The AI only edits your working tree, and only when y
 - **Export** the review (progress, summary, discussions, open findings) as markdown.
 
 **Talking to the AI**
-- Discussions anchored to lines, with four actions:
-  - **Note**: just for you.
-  - **Add to review**: collect comments, then **Submit review** sends them all to the AI as one task,
-    like a GitHub review.
-  - **Ask now**: the AI answers now.
-  - **Add AI to-do**: queued background work; its changes land at the end of the queue.
-- Discussions, findings and AI notes follow their code when it moves; when it is changed or removed
+- Each step keeps its own history of conversations, and the whole change has one too; a switch at the
+  top of the Conversations tab goes between them. Resolved conversations fold away.
+- Conversations about lines, a step or the whole change, with two actions:
+  - **Start conversation**: the AI answers now.
+  - **Add for later**: it waits in the last step; **Let the AI resolve them** sends all of them to the
+    AI as one task (like submitting a GitHub review), or you resolve them yourself.
+- Conversations, findings and AI notes follow their code when it moves; when it is changed or removed
   they are marked *outdated* and disappear from the code.
+- **AI changes** on their own: every AI job that edits code (and `cargo fmt` / `clippy --fix`) is
+  recorded as a snapshot of the working tree before and after it. "Show changes" under its note, or
+  the "AI changes to check" list above the steps, shows only what that job changed. **Accept** keeps it
+  and counts the lines it wrote as reviewed; **Reject** puts its files back as they were before it
+  (files you edited again since are left alone).
 - Live **AI activity** panel showing what the AI is doing (files read, edits, commands), with **Stop**.
-- **Chat** tab for questions about the change as a whole, plus a one-click **summary**: what it does,
-  how, risks, and where to look closely.
+- A **Whole change** conversation for questions about the change as a whole, with a one-click
+  **summary**: what it does, how, risks, and where to look closely.
 - Backends: Claude Code (`claude -p`), OpenAI Codex (`codex exec`), GitHub Copilot CLI (`copilot -p`)
   or a custom command that reads the prompt on stdin. Model and reasoning effort are configurable,
   also in the middle of a review.
@@ -112,20 +125,25 @@ Nothing is committed, ever. The AI only edits your working tree, and only when y
   and in a Findings tab, with **Fix**, **Fix all**, **Discuss** and **Dismiss**.
 - Lock files and generated code (`Cargo.lock`, `package-lock.json`, `*.min.js`, `dist/**`…) are left
   out of AI planning, reviews and summaries by default; the patterns are configurable in Settings.
-- **cargo fmt**, **cargo clippy** (warnings become findings) and **cargo clippy --fix** from the Tools menu.
+- **cargo fmt**, **cargo clippy** (whole workspace, all targets; warnings become findings) and
+  **cargo clippy --fix** from the Tools menu.
 
 **Code navigation and editing**
 - rust-analyzer integration: hover, ⌘-click go to definition, right-click find references, and
   **rename** (F2) across the whole project. Lines you had already accepted stay accepted (or ask for
   another look, your choice), and lines the rename adds to the change count as your own edit. If the
   target is already on screen, the view scrolls there; otherwise the file opens in the main window.
-- Open any changed file in a built-in editor (CodeMirror). Lines you write yourself count as
-  accepted, and the diff and queue update on save.
+- Edit code **in place**: "✎ Edit" (or `e`) turns a hunk into an editor right in the diff. "Open file"
+  shows the whole file in the built-in editor (CodeMirror). Lines you write yourself count as accepted,
+  and the diff and steps update on save.
 
 **Settings**
-- Default AI, model and reasoning; your own instructions for the AI; preferences (default layout,
+- Default AI, model (with the models the installed CLI names in its help suggested), reasoning and the
+  language the AI writes in (your system's language by default); your own instructions for the AI;
+  preferences (default layout,
   default order, auto-advance, notes expanded, hover delay…).
-- Every keyboard shortcut can be changed, and every action has at least two of them.
+- Every keyboard shortcut can be changed, and every action has at least two of them. Modifier + arrow
+  keys are left to text editing (jumping by word or line, selecting with Shift).
 
 ## Screenshots
 

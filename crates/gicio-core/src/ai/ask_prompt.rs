@@ -6,8 +6,7 @@ use anyhow::Result;
 const MAX_CHUNK_DIFF_LINES: usize = 400;
 
 /// Prompt for one reviewer message in a thread: chunk diff, anchor, history, question.
-/// With `task`, the message is a to-do the AI carries out in the background.
-pub fn build_ask_prompt(session: &Session, thread_id: &ThreadId, task: bool, extra: &ExtraInstructions) -> Result<String> {
+pub fn build_ask_prompt(session: &Session, thread_id: &ThreadId, extra: &ExtraInstructions) -> Result<String> {
     let thread = session.thread(thread_id)?;
     let st = &session.state;
     let mut out = format!(
@@ -58,16 +57,12 @@ pub fn build_ask_prompt(session: &Session, thread_id: &ThreadId, task: bool, ext
     }
 
     out.push_str(&instructions_prompt(&st.repo, &st.backend.engine, extra));
-    out.push_str(if task {
-        "\nThe reviewer's latest message is a task for you. Carry it out by editing files in the working tree: \
-         focused changes, nothing unrelated. Never commit, stage, stash, checkout or otherwise change git state. \
-         Run the build or tests if that helps you check the change.\n"
-    } else if thread.allow_edits {
+    out.push_str(if thread.allow_edits {
         "\nReply to the reviewer's latest message. If they ask for a change, or you find a real problem while answering, \
          fix it by editing files in the working tree: minimal, focused edits, nothing unrelated. Never commit, stage, \
          stash, checkout or otherwise change git state.\n"
     } else {
-        "\nReply to the reviewer's latest message. You CANNOT modify files in this conversation (editing is turned off). If the reviewer asks for a change, do not say you will do it: say in one sentence that editing is off here and they can tick \"AI may edit code\" or start an \"AI task\"; you may describe the change briefly.\n"
+        "\nReply to the reviewer's latest message. You CANNOT modify files in this conversation (editing is turned off). If the reviewer asks for a change, do not say you will do it: say in one sentence that editing is off here and they can tick \"AI may edit code\"; you may describe the change briefly.\n"
     });
     out.push_str(
         "Your final message is shown verbatim to the reviewer, in the reviewer's language. Be brief and strictly on topic: \

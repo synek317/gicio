@@ -1,4 +1,5 @@
 <script lang="ts">
+  import ChangeView from './ChangeView.svelte';
   import ChunkView from './ChunkView.svelte';
   import FileView from './FileView.svelte';
   import RefsView from './RefsView.svelte';
@@ -17,6 +18,8 @@
   <main id="diff-scroll" class="main" class:no-scroll={v?.kind === 'source'}>
     {#if v?.kind === 'source'}
       {#key `${v.absPath}#${app.fileRev}`}<FileView absPath={v.absPath} repoPath={v.repoPath} line={v.line} title={v.title} />{/key}
+    {:else if v?.kind === 'change'}
+      <ChangeView id={v.id} />
     {:else if v?.kind === 'refs'}
       <RefsView title={v.title} locs={v.locs} />
     {:else if app.snap?.files.length}

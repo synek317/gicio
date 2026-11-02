@@ -21,6 +21,7 @@
   const onScreen = $derived(paths.some((p) => app.onScreen[p]));
   const hovered = $derived(!!app.hoverPath && paths.includes(app.hoverPath));
   const current = $derived(!!app.currentFile && paths.includes(app.currentFile));
+  const inStep = $derived(paths.some((p) => app.stepPaths.has(p)));
 
   // Follow the file being read: unfold its folders and keep its row visible.
   $effect(() => {
@@ -31,7 +32,7 @@
 </script>
 
 <li class="tnode {st}">
-  <div class="trow" bind:this={row} class:active class:onscreen={onScreen} class:hovered style="padding-left:{depth * 12 + 4}px">
+  <div class="trow" bind:this={row} class:active class:onscreen={onScreen} class:hovered class:instep={inStep} title={inStep && file ? 'Part of the current step' : undefined} style="padding-left:{depth * 12 + 4}px">
     {#if file}
       <button class="tname" onclick={() => go({ kind: 'file', path: file.path })} title={file.path}>
         <span class="qicon" title={progressTooltip(st, p)}>{progressIcons[st]}</span>

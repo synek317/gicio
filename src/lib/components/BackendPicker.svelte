@@ -1,16 +1,27 @@
 <script lang="ts">
   import type { BackendForm } from '../backend-form';
   import { api } from '../api';
+  import { languageOptions } from '../languages';
   import type { BackendKind, Effort } from '../types';
+  import ComboBox from './ComboBox.svelte';
 
   let { form = $bindable() }: { form: BackendForm } = $props();
 
+  /** Known models; whatever the installed CLI lists in its help comes first. */
   const MODELS: Record<BackendKind, string[]> = {
     claude: ['fable', 'opus', 'sonnet', 'haiku'],
     codex: ['gpt-5-codex', 'gpt-5'],
     copilot: ['claude-sonnet-4.5', 'gpt-5'],
     custom: [],
   };
+  let detected = $state<Partial<Record<BackendKind, string[]>>>({});
+  $effect(() => {
+    const kind = form.kind;
+    if (kind === 'custom' || detected[kind]) return;
+    api.aiModels(kind).then((m) => (detected = { ...detected, [kind]: m })).catch(() => {});
+  });
+  const models = $derived([...new Set([...(detected[form.kind] ?? []), ...MODELS[form.kind]])]);
+  const languages = languageOptions();
   const EFFORTS: Effort[] = ['low', 'medium', 'high', 'xhigh', 'max'];
 
   /** How to get each CLI; they sign in with your own account (Codex: your ChatGPT plan). */
@@ -37,10 +48,7 @@
   {#if form.kind === 'custom'}
     <label>Command <input bind:value={form.command} placeholder="ollama run qwen3-coder" spellcheck="false" /></label>
   {:else}
-    <label>Model
-      <input bind:value={form.model} list="models-{form.kind}" placeholder="CLI default" spellcheck="false" />
-      <datalist id="models-{form.kind}">{#each MODELS[form.kind] as m}<option value={m}></option>{/each}</datalist>
-    </label>
+    <label>Model <ComboBox bind:value={form.model} options={models} placeholder="CLI default" /></label>
   {/if}
   <label title={form.kind === 'custom' ? 'Not supported for custom commands' : 'Claude: --effort. Copilot: --reasoning-effort. Codex: model_reasoning_effort (xhigh/max = high).'}>Reasoning
     <select bind:value={form.effort} disabled={form.kind === 'custom'}>
@@ -48,7 +56,7 @@
       {#each EFFORTS as e}<option value={e}>{e}</option>{/each}
     </select>
   </label>
-  <label>AI writes in <input bind:value={form.language} spellcheck="false" /></label>
+  <label>AI writes in <ComboBox bind:value={form.language} options={languages} /></label>
 </div>
 {#if missing}
   <div class="tool-missing">

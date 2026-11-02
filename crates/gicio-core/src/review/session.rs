@@ -103,6 +103,7 @@ impl Session {
             threads: self.state.threads.clone(),
             chat: self.state.chat.clone(),
             findings: self.state.findings.clone(),
+            changes: self.state.changes.clone(),
             summary: self.state.summary.clone(),
             chat_busy: self.chat_busy,
             summary_busy: self.summary_busy,
@@ -196,7 +197,7 @@ impl Session {
                 continue;
             }
             let origin = if by_ai { ChunkOrigin::Ai } else { ChunkOrigin::Fallback };
-            chunks.push(Chunk { id: self.state.next_chunk_id(), title: p.title, summary: p.summary, hunks: refs, origin, notes: p.notes });
+            chunks.push(Chunk { id: self.state.next_chunk_id(), title: p.title, summary: p.summary, hunks: refs, origin, notes: p.notes, group: p.group });
         }
         let leftovers = coverage.leftovers();
         if !leftovers.is_empty() {
@@ -207,6 +208,7 @@ impl Session {
                 hunks: leftovers,
                 origin: ChunkOrigin::Fallback,
                 notes: Vec::new(),
+                group: None,
             });
         }
         self.files = files;
@@ -412,9 +414,9 @@ impl Session {
         true
     }
 
-    pub fn create_thread(&mut self, chunk: Option<ChunkId>, anchor: Option<Anchor>, allow_edits: bool, todo: bool) -> ThreadId {
+    pub fn create_thread(&mut self, chunk: Option<ChunkId>, anchor: Option<Anchor>, allow_edits: bool) -> ThreadId {
         let id = self.state.next_thread_id();
-        self.state.threads.push(Thread { id: id.clone(), chunk, anchor, status: ThreadStatus::Open, allow_edits, todo, messages: Vec::new(), busy: false });
+        self.state.threads.push(Thread { id: id.clone(), chunk, anchor, status: ThreadStatus::Open, allow_edits, messages: Vec::new(), busy: false });
         self.touch();
         id
     }

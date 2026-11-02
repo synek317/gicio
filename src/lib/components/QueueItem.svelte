@@ -6,8 +6,9 @@
   import { app } from '../state.svelte';
   import type { Chunk } from '../types';
   import ProgressBar from './ProgressBar.svelte';
+  import StepFiles from './StepFiles.svelte';
 
-  let { chunk: c, index }: { chunk: Chunk; index: number } = $props();
+  let { chunk: c, label }: { chunk: Chunk; label: string } = $props();
 
   const p = $derived(app.chunkProgress(c));
   const st = $derived(progressState(p));
@@ -33,9 +34,13 @@
   <button class="qitem {st}" class:active onclick={() => go({ kind: 'chunk', id: c.id })}>
     <span class="qicon" title={progressTooltip(st, p)}>{progressIcons[st]}</span>
     <span class="qtext">
-      <span class="qtitle">{index + 1}. {c.title}</span>
-      <span class="qmeta">{p.total} lines{#if threads} · 💬 {threads}{/if}{#if c.notes?.length} · ? {c.notes.length}{/if}{#if c.origin.kind === 'followUp'} · follow-up{/if}</span>
-      {#if st !== 'done'}<ProgressBar {p} thin />{/if}
+      <span class="qtitle">{label}. {c.title}</span>
+      {#if st !== 'done'}
+        <span class="qmeta">{p.total} lines{#if threads} · 💬 {threads}{/if}{#if c.notes?.length} · ? {c.notes.length}{/if}{#if c.origin.kind === 'followUp'} · follow-up{/if}</span>
+        <ProgressBar {p} thin />
+      {/if}
     </span>
+    {#if st === 'done'}<span class="stamp">Done</span>{/if}
   </button>
+  {#if active}<StepFiles chunk={c} />{/if}
 </li>

@@ -73,7 +73,15 @@ code { font-family: var(--mono); font-size: 12px; }
 .queue { list-style: none; margin: 0; padding: 0; }
 .qitem { display: flex; gap: 8px; width: 100%; text-align: left; background: transparent; border: 1px solid transparent; padding: 6px 8px; margin-bottom: 2px; white-space: normal; }
 .qitem.active { background: var(--bg); border-color: var(--accent); }
-.qitem.done .qtitle { color: var(--muted); }
+.qitem { align-items: flex-start; }
+.qitem.done .qtitle { color: var(--muted); text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--muted) 70%, transparent); }
+/* A rubber stamp on finished steps; they stay in place in the list. */
+.file-head .stamp { font-size: 9px; padding: 1px 4px; }
+.stamp { flex: none; align-self: center; font: 700 9.5px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--ok); border: 1.5px solid var(--ok); border-radius: 3px; padding: 2px 4px; transform: rotate(-8deg); opacity: .8; }
+.queue.nested { margin-left: 14px; padding-left: 4px; border-left: 1px solid var(--border); }
+.qgroup-head .qtitle { font-weight: 600; }
+.later-step { border-top: 1px dashed var(--border); border-radius: 0 0 6px 6px; margin-top: 4px; }
+.later-step.active { border-top-style: solid; }
 .qicon { width: 14px; flex: none; color: var(--muted); }
 .done > .qicon, .done .qicon { color: var(--ok); }
 .deferred .qicon { color: var(--warn); }
@@ -92,9 +100,6 @@ code { font-family: var(--mono); font-size: 12px; }
 .factions button { padding: 0 6px; }
 .status { font: 10px var(--mono); text-transform: uppercase; padding: 0 4px; border-radius: 4px; background: var(--bg3); }
 .s-added { color: var(--ok); } .s-deleted { color: var(--err); } .s-renamed { color: var(--ai); } .s-modified { color: var(--warn); }
-.later h3 { font-size: 12px; text-transform: uppercase; color: var(--muted); margin: 14px 4px 4px; }
-.later ul { list-style: none; padding: 0 4px; margin: 0; }
-.later li { padding: 2px 0; word-break: break-all; }
 
 /* progress */
 .pbar { display: flex; height: 6px; background: var(--bg3); border-radius: 3px; overflow: hidden; min-width: 80px; }
@@ -120,6 +125,17 @@ code { font-family: var(--mono); font-size: 12px; }
 .hunk { border-top: 1px solid var(--border); scroll-margin-top: 140px; }
 .hunk:first-of-type { border-top: none; }
 .hunk.focused { box-shadow: inset 3px 0 0 var(--accent); }
+.hunk.editing { box-shadow: inset 3px 0 0 var(--ai); }
+.inline-editor { border-top: 1px solid var(--border); }
+.inline-editor-host .cm-editor.cm-focused { outline: none; }
+.hunk.editing .hunk-head button { opacity: 1; }
+/* The editor shows the diff in the colours of the diff view. */
+.inline-editor .cm-editor, .inline-editor .cm-gutters { background: var(--bg) !important; }
+.inline-editor .cm-gutters { color: var(--muted) !important; border-right: 1px solid var(--border) !important; }
+.inline-editor .cm-changedLine { background: var(--add-bg) !important; }
+.inline-editor .cm-deletedChunk { background: var(--del-bg) !important; padding: 0 !important; }
+.inline-editor .cm-deletedChunk del { text-decoration: none; }
+.inline-editor-bar { padding: 4px 10px; background: var(--bg2); border-top: 1px solid var(--border); }
 .hunk-head { display: flex; align-items: center; gap: 8px; padding: 2px 10px; background: var(--bg3); font: 11.5px var(--mono); color: var(--muted); }
 .hunk-head button { font: 11px -apple-system, sans-serif; padding: 0 7px; opacity: 0; }
 .hunk:hover .hunk-head button, .hunk.focused .hunk-head button { opacity: 1; }
@@ -152,7 +168,7 @@ code { font-family: var(--mono); font-size: 12px; }
 .tmark { text-align: center; }
 .thread-dot { padding: 0; border: none; background: none; font-size: 11px; opacity: 0.55; line-height: 1; }
 .thread-dot.open { opacity: 1; }
-.selection-bar { position: fixed; bottom: 40px; left: calc(290px + (100vw - 290px - 400px) / 2); transform: translateX(-50%); z-index: 20; display: flex; gap: 6px; align-items: center; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 6px 10px; box-shadow: 0 6px 24px rgba(0,0,0,.18); }
+.sel-pop { position: fixed; z-index: 20; display: flex; flex-direction: column; gap: 6px; background: var(--bg); border: 1px solid var(--accent); border-radius: 10px; padding: 6px 8px; box-shadow: 0 6px 24px rgba(0,0,0,.22); font-size: 12px; }
 
 /* threads */
 .threads { border-left: 1px solid var(--border); display: flex; flex-direction: column; min-height: 0; background: var(--bg2); }
@@ -223,8 +239,6 @@ legend { font-weight: 600; padding: 0 4px; }
 .indent { margin-left: 24px; display: flex; flex-direction: column; gap: 4px; }
 .qhead { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 8px 6px 4px; font-weight: 600; }
 button.toggle-head { background: none; border: none; padding: 0; margin-top: 14px; cursor: pointer; }
-.done-list .qitem { padding-top: 3px; padding-bottom: 3px; }
-.done-list .qmeta { display: none; }
 .qempty { padding: 4px 8px; }
 .tree { list-style: none; margin: 0; padding: 0; }
 .trow { display: flex; align-items: center; border-radius: 6px; }
@@ -288,15 +302,12 @@ button.danger { color: var(--err); border-color: color-mix(in srgb, var(--err) 5
 .right-tabs { border-bottom: none; }
 .right-tabs button { flex: none; padding: 4px 10px; }
 .threads-head { padding: 0 10px; }
-.chat { display: flex; flex-direction: column; flex: 1; min-height: 0; background: var(--bg); }
-.chat-list { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 10px; padding: 10px 12px; }
-.chat-summary { border-bottom: 1px solid var(--border); padding-bottom: 10px; line-height: 1.55; }
+.chat-summary { border-bottom: 1px solid var(--border); padding-bottom: 8px; line-height: 1.55; }
 .chat-summary > summary { cursor: pointer; list-style: none; padding: 2px 0 6px; }
 .chat-summary > summary::-webkit-details-marker { display: none; }
 .chat-summary > summary::before { content: '▸'; color: var(--muted); width: 10px; }
 .chat-summary[open] > summary::before { content: '▾'; }
 .chat-summary-title { font-size: 12px; font-weight: 600; color: var(--muted); }
-.chat-compose { display: flex; flex-direction: column; gap: 6px; padding: 8px 12px; border-top: 1px solid var(--border); background: var(--bg2); }
 textarea.reply { resize: none; }
 .settings { width: 760px; height: 80vh; display: flex; flex-direction: column; gap: 10px; }
 .settings h2 { margin: 0; }
@@ -336,8 +347,7 @@ label.choice.disabled { opacity: 0.5; }
 .finding.st-dismissed, .finding.st-fixed { opacity: 0.6; }
 .fdetail pre { white-space: pre-wrap; font-size: 11px; max-height: 240px; overflow: auto; }
 .findings-panel .row.wrap { flex-wrap: wrap; }
-.submit-bar { padding: 6px 10px; background: color-mix(in srgb, var(--accent) 12%, var(--bg2)); border-bottom: 1px solid var(--border); font-size: 12px; }
-.msg.pending { outline: 1px dashed var(--accent); }
+.later-bar { margin: 4px 0 8px; padding: 6px 10px; max-width: 900px; border: 1px solid var(--warn); border-radius: 8px; background: var(--warn-bg); font-size: 12px; }
 .st-fixing { color: var(--ai); border-color: var(--ai); }
 .st-fixed { color: var(--ok); border-color: var(--ok); }
 .chevron { padding: 0 4px; width: 20px; }
@@ -349,9 +359,6 @@ label.choice.disabled { opacity: 0.5; }
 .qrow .unaccept { position: absolute; right: 4px; top: 6px; z-index: 1; display: none; padding: 0 6px; }
 .qrow:hover .unaccept { display: block; }
 .start-card label.toggle.remember { flex-direction: row; font-weight: normal; color: var(--fg); }
-.split-button { display: inline-flex; }
-.split-button > button:first-child { border-radius: 6px 0 0 6px; }
-.split-button > button.caret { border-radius: 0 6px 6px 0; border-left: none; padding: 3px 6px; }
 .menu.dropdown { min-width: 300px; }
 .menu.dropdown .muted { font-size: 11px; }
 label.choice, .settings label.choice { display: flex; flex-direction: row; align-items: flex-start; gap: 8px; font-weight: normal; cursor: pointer; }
@@ -387,3 +394,35 @@ button.resolve { border-color: var(--ok); color: var(--ok); }
 .anchor.gone { text-decoration: line-through; color: var(--muted); }
 .tool-missing { grid-column: 1 / -1; margin-top: 6px; padding: 8px 10px; border: 1px solid var(--warn); border-radius: 6px; background: var(--warn-bg); font-size: 12px; line-height: 1.5; }
 .tool-missing code { user-select: all; }
+.combo { position: relative; }
+.combo-list { position: fixed; z-index: 95; overflow: auto; margin: 0; padding: 4px; list-style: none; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; box-shadow: 0 8px 24px rgba(0,0,0,.2); font-weight: normal; }
+.combo-list li { padding: 3px 8px; border-radius: 4px; cursor: pointer; }
+.combo-list li:hover, .combo-list li.active { background: var(--sel); }
+.combo-list li.current { font-weight: 600; }
+/* Bar at the left of each block of changed lines: click accepts the whole block. */
+.block-bar { position: absolute; left: 0; top: 0; bottom: 0; width: 5px; padding: 0; border: none; border-radius: 0; background: transparent; z-index: 1; cursor: pointer; }
+.line.added .block-bar { background: color-mix(in srgb, var(--ok) 35%, transparent); }
+.line.removed .block-bar { background: color-mix(in srgb, var(--err) 30%, transparent); }
+.line.accepted .block-bar { background: transparent; }
+.line .block-bar.hot, .line .block-bar.hot:hover { background: var(--ok) !important; width: 7px; }
+/* File bars show only the main action; the rest appears on hover. */
+.file-head .secondary { opacity: 0; }
+.file-head:hover .secondary, .file-head:focus-within .secondary { opacity: 1; }
+.chunk-head h1 .feature { font-weight: 500; }
+.scope-switch { display: flex; padding: 6px 8px 0; }
+.scope-switch button { flex: 1; font-size: 12px; }
+.clear-chat { align-self: flex-end; color: var(--muted); }
+/* Files of the current step: marked in the file tree, listed under the step. */
+.trow.instep { box-shadow: inset 2px 0 0 var(--accent); }
+.trow.instep .tlabel { font-weight: 600; }
+.step-files { list-style: none; margin: -1px 0 4px 22px; padding: 2px 0 2px 6px; border-left: 1px solid var(--accent); }
+.step-file { display: flex; align-items: center; gap: 5px; width: 100%; padding: 1px 4px; border: none; background: none; text-align: left; font-size: 11.5px; min-width: 0; }
+.step-file.onscreen { background: var(--sel); }
+.step-file.done .step-file-name { color: var(--muted); text-decoration: line-through; }
+.step-file-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; min-width: 0; flex: 1; }
+/* AI changes: the list above the steps, the links under "code changed" notes. */
+.ai-changes { margin-bottom: 6px; }
+.ai-changes .qitem { padding-right: 8px; }
+.change-row-actions { display: flex; gap: 4px; justify-content: flex-end; padding: 0 8px 4px 30px; }
+.change-links { margin-top: 6px; flex-wrap: wrap; }
+.change-empty { padding: 6px 10px; margin: 0; }

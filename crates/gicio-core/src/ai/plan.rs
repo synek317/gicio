@@ -22,6 +22,12 @@ pub struct PlanRequest {
 
 #[derive(Deserialize)]
 struct RawPlan {
+    features: Vec<RawFeature>,
+}
+
+#[derive(Deserialize)]
+struct RawFeature {
+    title: String,
     chunks: Vec<RawChunk>,
 }
 
@@ -56,7 +62,7 @@ pub async fn plan(req: PlanRequest, log: LogSink, cancel: Option<oneshot::Receiv
         kept_titles: &req.kept_titles,
     });
     let answer = run_streaming(&req.backend, &req.repo, &prompt, AccessMode::ReadOnly, log, cancel).await?;
-    let value = extract_object_with_key(&answer, "chunks").with_context(|| format!("planner returned no JSON plan: {}", answer.chars().take(400).collect::<String>()))?;
+    let value = extract_object_with_key(&answer, "features").with_context(|| format!("planner returned no JSON plan: {}", answer.chars().take(400).collect::<String>()))?;
     let raw: RawPlan = serde_json::from_value(value)?;
     let item = |l: &str| {
         let label = parse_label(l)?;
@@ -75,13 +81,15 @@ pub async fn plan(req: PlanRequest, log: LogSink, cancel: Option<oneshot::Receiv
         Some(Note { path: h.path.clone(), side, line: no, text: n.text.clone(), code: line.text.clone(), outdated: false })
     };
     let chunks: Vec<PlannedChunk> = raw
-        .chunks
+        .features
         .iter()
-        .map(|c| PlannedChunk {
+        .flat_map(|f| f.chunks.iter().map(move |c| (f, c)))
+        .map(|(f, c)| PlannedChunk {
             title: c.title.clone(),
             summary: c.summary.clone(),
             items: c.hunks.iter().filter_map(|l| item(l)).collect(),
             notes: c.notes.iter().filter_map(note).collect(),
+            group: Some(f.title.clone()),
         })
         .filter(|c| !c.items.is_empty())
         .collect();

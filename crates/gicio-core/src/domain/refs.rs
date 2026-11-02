@@ -75,3 +75,35 @@ impl From<CommitId> for String {
         c.0
     }
 }
+
+/// A git tree object: a whole snapshot of the working tree, taken before and after the AI edits it.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(try_from = "String", into = "String")]
+pub struct TreeId(String);
+
+impl TreeId {
+    pub fn new(raw: &str) -> Result<Self> {
+        let raw = raw.trim();
+        if raw.len() < 40 || !raw.chars().all(|c| c.is_ascii_hexdigit()) {
+            bail!("invalid tree id: {raw:?}");
+        }
+        Ok(Self(raw.to_string()))
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl TryFrom<String> for TreeId {
+    type Error = anyhow::Error;
+    fn try_from(s: String) -> Result<Self> {
+        Self::new(&s)
+    }
+}
+
+impl From<TreeId> for String {
+    fn from(t: TreeId) -> String {
+        t.0
+    }
+}

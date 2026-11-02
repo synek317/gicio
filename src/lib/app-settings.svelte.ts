@@ -1,6 +1,7 @@
 import { api, inTauri } from './api';
 import type { BackendForm } from './backend-form';
 import { defaultKeybindings, type Keybindings } from './keymap';
+import { systemLanguage } from './languages';
 import { defaultStartOptions, type StartOptions } from './start-options';
 
 export interface Prefs {
@@ -40,7 +41,7 @@ export const DEFAULT_SKIP = [
 
 export function defaultSettings(): AppSettings {
   return {
-    defaultBackend: { kind: 'claude', command: '', model: '', effort: '', language: 'English' },
+    defaultBackend: { kind: 'claude', command: '', model: '', effort: '', language: systemLanguage() },
     aiInstructions: '',
     skipLowValue: true,
     skipPatterns: [...DEFAULT_SKIP],
@@ -49,6 +50,21 @@ export function defaultSettings(): AppSettings {
     prefs: { layout: 'split', autoAdvance: true, notesExpanded: false, confirmStartOver: true, hoverDelayMs: 450, blankLines: 'ask', renameAccepted: 'ask' },
     keybindings: defaultKeybindings(),
   };
+}
+
+/** Modifier + arrow combos are left to text editing (word and line jumps, selecting with Shift). */
+const editingCombo = (c: string) => /arrow/.test(c) && /(mod|ctrl|alt|shift)\+/.test(c);
+
+/** Saved shortcuts over the defaults. Actions that no longer exist are dropped; an action that lost
+ *  editing combos gets the default ones back so it keeps at least two. */
+function mergeKeybindings(defaults: Keybindings, saved: Partial<Keybindings> | undefined): Keybindings {
+  const out = { ...defaults };
+  for (const [id, combos] of Object.entries(saved ?? {}) as [keyof Keybindings, string[]][]) {
+    if (!(id in defaults)) continue;
+    const kept = combos.filter((c) => !editingCombo(c));
+    out[id] = kept.length < combos.length ? [...new Set([...kept, ...defaults[id]])] : kept;
+  }
+  return out;
 }
 
 function merge(raw: Partial<AppSettings> | null): AppSettings {
@@ -64,7 +80,7 @@ function merge(raw: Partial<AppSettings> | null): AppSettings {
     skipLowValue: raw.skipLowValue ?? true,
     skipPatterns: raw.skipPatterns ?? [...DEFAULT_SKIP],
     prefs: { ...d.prefs, ...raw.prefs },
-    keybindings: { ...d.keybindings, ...raw.keybindings },
+    keybindings: mergeKeybindings(d.keybindings, raw.keybindings),
   };
 }
 

@@ -58,6 +58,7 @@ async fn plan_and_apply(app: AppHandle, state: State<'_, AppState>, replan: bool
                     summary: "Not sent to the AI (see Settings → AI → skip). Usually not worth a line-by-line review; skim and accept.".into(),
                     items: skipped.iter().map(|id| PlannedItem { hunk: id.clone(), part: None }).collect(),
                     notes: Vec::new(),
+                    group: None,
                 });
             }
             // Chunks kept during a replan may have changed meanwhile; take their current version.

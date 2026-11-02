@@ -21,7 +21,6 @@ impl fmt::Display for JobId {
 #[serde(rename_all = "camelCase")]
 pub enum JobKind {
     Ask,
-    Todo,
     Plan,
     Chat,
     Summary,
@@ -64,8 +63,8 @@ struct Inner {
 #[derive(Default)]
 pub struct Jobs {
     inner: Mutex<Inner>,
-    /// Background to-dos edit the same working tree, so they run one at a time.
-    pub todo_lock: tokio::sync::Mutex<()>,
+    /// Background AI edits (resolving later issues, fixes) share the working tree, so they run one at a time.
+    pub edit_lock: tokio::sync::Mutex<()>,
 }
 
 #[derive(Clone, Serialize)]
@@ -85,10 +84,6 @@ impl Jobs {
         };
         self.emit(app);
         id
-    }
-
-    pub fn status(&self, id: &JobId) -> Option<JobStatus> {
-        self.inner.lock().unwrap().list.iter().find(|j| &j.id == id).map(|j| j.status)
     }
 
     pub fn set_status(&self, app: &AppHandle, id: &JobId, status: JobStatus) {

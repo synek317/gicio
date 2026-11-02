@@ -11,7 +11,7 @@
   function discuss() {
     app.composer = { anchor: { path: f.path, side: f.side, start: f.line, end: Math.max(f.line, f.endLine) }, chunk: app.view?.kind === 'chunk' ? app.view.id : null };
     app.composerDraft = `${f.title}${f.detail ? `\n\n${f.detail}` : ''}`;
-    app.rightTab = 'discussions';
+    app.rightTab = 'conversations';
   }
 </script>
 

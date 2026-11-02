@@ -29,3 +29,12 @@ pub fn set_backend(app: AppHandle, state: State<'_, AppState>, backend: AiBacken
 pub fn ai_tools() -> std::collections::HashMap<&'static str, bool> {
     ["claude", "codex", "copilot"].into_iter().map(|t| (t, gicio_core::ai::resolve_program(t).is_some())).collect()
 }
+
+/// Models the given AI command-line tool names in its help, for suggestions in the model picker.
+#[tauri::command]
+pub async fn ai_models(program: String) -> Vec<String> {
+    match program.as_str() {
+        "claude" | "codex" | "copilot" => gicio_core::ai::detect_models(&program).await,
+        _ => Vec::new(),
+    }
+}

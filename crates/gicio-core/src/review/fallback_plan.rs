@@ -16,6 +16,7 @@ pub fn fallback_plan(files: &[FileDiff]) -> Vec<PlannedChunk> {
             summary: format!("{:?} file, {} hunk(s).", f.status, f.hunks.len()),
             items: f.hunks.iter().map(|h| PlannedItem { hunk: h.id.clone(), part: None }).collect(),
             notes: Vec::new(),
+            group: None,
         })
         .collect()
 }

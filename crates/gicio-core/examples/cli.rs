@@ -45,9 +45,9 @@ async fn main() -> anyhow::Result<()> {
         Some("thread") => {
             // Mimics the app's send_message: ask on the first chunk containing store.rs, allow edits.
             let chunk = s.state.chunks.iter().find(|c| c.hunks.iter().any(|h| h.path.as_str() == "src/store.rs")).unwrap().id.clone();
-            let t = s.create_thread(Some(chunk.clone()), None, true, false);
+            let t = s.create_thread(Some(chunk.clone()), None, true);
             s.push_message(&t, gicio_core::review::Message::new(gicio_core::review::Author::Human, gicio_core::review::MessageKind::Text, args[3].clone()))?;
-            let prompt = ai::build_ask_prompt(&s, &t, false, &Default::default())?;
+            let prompt = ai::build_ask_prompt(&s, &t, &Default::default())?;
             let answer = ai::run(&backend, &s.state.repo, &prompt, AccessMode::Edit).await?;
             println!("AI: {answer}\n");
             let report = s.refresh(Some((Some(chunk), "Follow-up".into(), Some(t))))?;
@@ -81,10 +81,10 @@ async fn main() -> anyhow::Result<()> {
                 (h.path.clone(), side_new(), h.new_start)
             });
             let excerpt = s.file(&anchor.0).and_then(|f| f.hunks.iter().flat_map(|h| h.lines.iter()).find(|l| l.new_no == Some(anchor.2)).map(|l| l.text.clone())).unwrap_or_default();
-            let t = s.create_thread(Some(chunk.id.clone()), Some(anchor_at(anchor.0.clone(), anchor.1, anchor.2, excerpt)), false, false);
+            let t = s.create_thread(Some(chunk.id.clone()), Some(anchor_at(anchor.0.clone(), anchor.1, anchor.2, excerpt)), false);
             let q = "Why is it done this way? Is there a simpler option?";
             s.push_message(&t, Message::new(Author::Human, MessageKind::Text, q))?;
-            let prompt = ai::build_ask_prompt(&s, &t, false, &Default::default())?;
+            let prompt = ai::build_ask_prompt(&s, &t, &Default::default())?;
             let answer = ai::run_streaming(&backend, &s.state.repo, &prompt, AccessMode::ReadOnly, sink(&logs), None).await?;
             s.push_message(&t, Message::new(Author::Ai { backend: backend.label() }, MessageKind::Text, answer.trim()))?;
             let ask_log = std::mem::take(&mut *logs.lock().unwrap());
@@ -109,7 +109,7 @@ async fn main() -> anyhow::Result<()> {
             }
             let jobs = serde_json::json!([
                 {"id": "j1", "kind": "plan", "status": "done", "title": "Plan review steps", "thread": null, "log": plan_log},
-                {"id": "j2", "kind": "todo", "status": "running", "title": "Add a unit test for the countdown formatting", "thread": null, "log": ask_log},
+                {"id": "j2", "kind": "review", "status": "running", "title": "Add a unit test for the countdown formatting", "thread": null, "log": ask_log},
             ]);
             s.save()?;
             std::fs::write(&args[3], serde_json::to_vec(&serde_json::json!({"snapshot": s.snapshot(), "texts": texts, "jobs": jobs}))?)?;
@@ -138,7 +138,7 @@ async fn main() -> anyhow::Result<()> {
         Some("anchors") => {
             let path = FilePath::new("src/item.rs")?;
             let excerpt = s.excerpt_of(&path, Side::New, 11, 11);
-            let t = s.create_thread(None, Some(Anchor { path: path.clone(), side: Side::New, start: 11, end: 11, excerpt, outdated: false }), false, false);
+            let t = s.create_thread(None, Some(Anchor { path: path.clone(), side: Side::New, start: 11, end: 11, excerpt, outdated: false }), false);
             let show = |s: &Session, what: &str| {
                 let a = s.thread(&t).unwrap().anchor.clone().unwrap();
                 println!("{what}: lines {}-{} outdated={} ({:?})", a.start, a.end, a.outdated, a.excerpt.trim());
