@@ -2,6 +2,7 @@ import { api } from './api';
 import type { FindOptions } from './find-query';
 import { presetFind, seedText } from './find.svelte';
 import { openLocation } from './lsp';
+import { showPanel } from './panels.svelte';
 import { app } from './state.svelte';
 import type { FileHits, LineHit, SearchQuery, SearchResults } from './types';
 
@@ -69,6 +70,7 @@ export function runSearch(delay = 250, force = false) {
 export function openProjectSearch() {
   const seed = seedText();
   if (seed) search.query = seed;
+  showPanel('left');
   app.sidebarTab = 'search';
   search.focus++;
 }

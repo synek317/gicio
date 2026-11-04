@@ -16,6 +16,9 @@ pub struct ReviewState {
     pub marks: Marks,
     pub threads: Vec<Thread>,
     pub planned_by_ai: bool,
+    /// How many steps the AI was last asked to plan.
+    #[serde(default)]
+    pub step_count: crate::ai::StepCount,
     #[serde(default)]
     pub diff_options: crate::diff::DiffOptions,
     #[serde(default)]
@@ -41,7 +44,7 @@ pub struct ReviewState {
 
 impl ReviewState {
     pub fn new(repo: RepoRoot, base_ref: GitRef, base_commit: CommitId, backend: AiBackend) -> Self {
-        Self { repo, base_ref, base_commit, backend, chunks: Vec::new(), marks: Marks::default(), threads: Vec::new(), planned_by_ai: false, diff_options: Default::default(), stage_mode: Default::default(), chat: Vec::new(), summary: None, findings: Vec::new(), changes: Vec::new(), line_signature: Vec::new(), last_chunk: None, next_id: 1 }
+        Self { repo, base_ref, base_commit, backend, chunks: Vec::new(), marks: Marks::default(), threads: Vec::new(), planned_by_ai: false, step_count: Default::default(), diff_options: Default::default(), stage_mode: Default::default(), chat: Vec::new(), summary: None, findings: Vec::new(), changes: Vec::new(), line_signature: Vec::new(), last_chunk: None, next_id: 1 }
     }
 
     fn next(&mut self) -> u64 {

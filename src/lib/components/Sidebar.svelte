@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { panelPref } from '../panels.svelte';
   import { app } from '../state.svelte';
   import FileTree from './FileTree.svelte';
   import QueueList from './QueueList.svelte';
@@ -11,7 +12,7 @@
   ] as const;
 </script>
 
-<aside class="sidebar">
+<aside class="sidebar" class:panel-hidden={!panelPref('left').visible}>
   <nav class="tabs">
     {#each tabs as [id, label]}
       <button class:active={app.sidebarTab === id} onclick={() => (app.sidebarTab = id)}>{label}</button>

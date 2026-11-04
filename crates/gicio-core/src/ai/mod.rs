@@ -20,6 +20,8 @@ mod plan_prompt;
 mod programs;
 mod review_prompt;
 mod run;
+mod step_count;
+mod step_total;
 
 pub use ai_review::{build_ai_review_prompt, build_fix_prompt, parse_findings, RawFinding};
 pub use ask_prompt::build_ask_prompt;
@@ -36,3 +38,5 @@ pub use models::detect_models;
 pub use plan::{plan, PlanRequest};
 pub use programs::{login_path, resolve_program};
 pub use run::{run, run_streaming, LogSink};
+pub use step_count::StepCount;
+pub use step_total::StepTotal;

@@ -50,7 +50,15 @@ code { font-family: var(--mono); font-size: 12px; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* layout */
-.app { display: grid; grid-template-columns: 290px minmax(0, 1fr) 400px; grid-template-rows: 40px minmax(0, 1fr) 26px; height: 100vh; }
+.app { display: grid; grid-template-columns: var(--left-panel) minmax(0, 1fr) var(--right-panel); grid-template-rows: 40px minmax(0, 1fr) 26px; height: 100vh; }
+aside.panel-hidden { display: none; }
+.panel-resizer { width: 6px; z-index: 20; cursor: col-resize; touch-action: none; display: flex; justify-content: center; outline: none; }
+.panel-resizer.left { grid-area: 2 / 1; justify-self: end; margin-right: -3px; }
+.panel-resizer.right { grid-area: 2 / 3; justify-self: start; margin-left: -3px; }
+.panel-resizer::after { content: ''; width: 2px; background: transparent; transition: background .1s; }
+.panel-resizer:hover::after, .panel-resizer:focus-visible::after, .panel-resizer.dragging::after { background: var(--accent); }
+.panel-toggle { padding: 2px 5px; display: inline-flex; align-items: center; color: var(--muted); }
+.panel-toggle.active { color: var(--fg); }
 .topbar { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; padding: 0 12px; border-bottom: 1px solid var(--border); background: var(--bg2); }
 .topbar .brand { color: var(--accent); }
 .topbar .repo { font-weight: 600; }
@@ -67,7 +75,7 @@ code { font-family: var(--mono); font-size: 12px; }
 .main { grid-area: 2 / 2; overflow: auto; position: relative; }
 
 /* sidebar */
-.sidebar { border-right: 1px solid var(--border); display: flex; flex-direction: column; min-height: 0; background: var(--bg2); }
+.sidebar { grid-area: 2 / 1; min-width: 0; border-right: 1px solid var(--border); display: flex; flex-direction: column; min-height: 0; background: var(--bg2); }
 .tabs { display: flex; border-bottom: 1px solid var(--border); }
 .tabs button { flex: 1; border: none; border-radius: 0; background: transparent; padding: 7px; border-bottom: 2px solid transparent; }
 .tabs button.active { border-bottom-color: var(--accent); font-weight: 600; }
@@ -174,7 +182,7 @@ code { font-family: var(--mono); font-size: 12px; }
 .sel-pop { position: fixed; z-index: 20; display: flex; flex-direction: column; gap: 6px; background: var(--bg); border: 1px solid var(--accent); border-radius: 10px; padding: 6px 8px; box-shadow: 0 6px 24px rgba(0,0,0,.22); font-size: 12px; }
 
 /* threads */
-.threads { border-left: 1px solid var(--border); display: flex; flex-direction: column; min-height: 0; background: var(--bg2); }
+.threads { grid-area: 2 / 3; min-width: 0; border-left: 1px solid var(--border); display: flex; flex-direction: column; min-height: 0; background: var(--bg2); }
 .threads-head { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-bottom: 1px solid var(--border); }
 .threads-head h2 { font-size: 13px; margin: 0; }
 .threads-body { overflow: auto; flex: 1; padding: 8px; display: flex; flex-direction: column; gap: 8px; }
@@ -367,6 +375,15 @@ label.choice.disabled { opacity: 0.5; }
 .start-card label.toggle.remember { flex-direction: row; font-weight: normal; color: var(--fg); }
 .menu.dropdown { min-width: 300px; }
 .menu.dropdown .muted { font-size: 11px; }
+.step-count { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.step-count .seg button { padding: 3px 8px; white-space: nowrap; }
+.step-count .seg button + button { border-left: none; }
+.menu .step-count .seg button { display: inline-block; background: var(--bg); border: 1px solid var(--border); }
+.menu .step-count .seg button + button { border-left: none; }
+.menu .step-count .seg button.active { background: var(--bg3); }
+.step-total { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; white-space: nowrap; }
+.step-total input { width: 64px; padding: 3px 6px; }
+.menu-steps { display: flex; flex-direction: column; gap: 5px; padding: 5px 10px 8px; border-bottom: 1px solid var(--border); margin-bottom: 3px; }
 label.choice, .settings label.choice { display: flex; flex-direction: row; align-items: flex-start; gap: 8px; font-weight: normal; cursor: pointer; }
 label.choice input { width: auto; margin-top: 3px; }
 .settings fieldset { margin-bottom: 4px; }

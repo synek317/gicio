@@ -2,6 +2,7 @@ import { api, inTauri } from './api';
 import type { BackendForm } from './backend-form';
 import { defaultKeybindings, type Keybindings } from './keymap';
 import { systemLanguage } from './languages';
+import { defaultPanelPrefs, type PanelPrefs } from './panel-prefs';
 import { defaultStartOptions, type StartOptions } from './start-options';
 
 export interface Prefs {
@@ -17,6 +18,8 @@ export interface Prefs {
   renameAccepted: 'ask' | 'keep' | 'review';
   /** Offer to install the project's language server when it is missing. */
   offerLspInstall: boolean;
+  /** Width and visibility of the side panels. */
+  panels: PanelPrefs;
 }
 
 export interface AppSettings {
@@ -49,7 +52,7 @@ export function defaultSettings(): AppSettings {
     skipPatterns: [...DEFAULT_SKIP],
     start: defaultStartOptions(),
     skipStartScreen: false,
-    prefs: { layout: 'split', autoAdvance: true, notesExpanded: false, confirmStartOver: true, hoverDelayMs: 450, blankLines: 'ask', renameAccepted: 'ask', offerLspInstall: true },
+    prefs: { layout: 'split', autoAdvance: true, notesExpanded: false, confirmStartOver: true, hoverDelayMs: 450, blankLines: 'ask', renameAccepted: 'ask', offerLspInstall: true, panels: defaultPanelPrefs() },
     keybindings: defaultKeybindings(),
   };
 }

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { api } from '../api';
   import type { StartOptions } from '../start-options';
+  import StepCountPicker from './StepCountPicker.svelte';
 
   let { options = $bindable(), repo = null, idPrefix = 'opt' }: { options: StartOptions; repo?: string | null; idPrefix?: string } = $props();
   let refs = $state<string[]>([]);
@@ -47,6 +48,12 @@
   <label class="choice"><input type="radio" bind:group={options.order} value="ai" />
     <span><strong>Logical steps planned by AI</strong><br /><span class="muted small">Groups related changes (also parts of files) and orders them so each step builds on the previous one. Takes a minute; you can start file by file meanwhile.</span></span>
   </label>
+  {#if options.order === 'ai'}
+    <div class="indent">
+      <span class="muted small">Number of steps</span>
+      <StepCountPicker bind:value={options.steps} />
+    </div>
+  {/if}
   <label class="choice"><input type="radio" bind:group={options.order} value="files" />
     <span><strong>File by file</strong><br /><span class="muted small">No planning.</span></span>
   </label>

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { openComposer } from '../actions';
+  import { panelPref } from '../panels.svelte';
   import { app } from '../state.svelte';
   import { stepLabel } from '../step-labels';
   import FindingsPanel from './FindingsPanel.svelte';
@@ -45,7 +46,7 @@
   const count = (whole: boolean) => (app.snap?.threads ?? []).filter((t) => isWhole(t) === whole && t.status !== 'resolved').length;
 </script>
 
-<aside class="threads">
+<aside class="threads" class:panel-hidden={!panelPref('right').visible}>
   <header class="threads-head">
     <nav class="tabs right-tabs">
       <button class:active={app.rightTab === 'conversations'} onclick={() => (app.rightTab = 'conversations')}>Conversations{#if app.snap?.chatBusy || app.snap?.threads.some((t) => t.busy)} <span class="spinner"></span>{/if}</button>

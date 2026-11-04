@@ -2,6 +2,7 @@
   import { revealLine, run } from '../actions';
   import { api } from '../api';
   import { renderMarkdown } from '../markdown';
+  import { showPanel } from '../panels.svelte';
   import { app } from '../state.svelte';
   import type { Finding } from '../types';
 
@@ -11,6 +12,7 @@
   function discuss() {
     app.composer = { anchor: { path: f.path, side: f.side, start: f.line, end: Math.max(f.line, f.endLine) }, chunk: app.view?.kind === 'chunk' ? app.view.id : null };
     app.composerDraft = `${f.title}${f.detail ? `\n\n${f.detail}` : ''}`;
+    showPanel('right');
     app.rightTab = 'conversations';
   }
 </script>

@@ -4,6 +4,7 @@ import { settings } from './app-settings.svelte';
 import { jumpFile, toggleCurrentFile } from './files-nav';
 import { closeFind, find, findStep, openFind } from './find.svelte';
 import { comboOf, type ActionId } from './keymap';
+import { togglePanel } from './panels.svelte';
 import { openProjectSearch } from './project-search.svelte';
 import { app } from './state.svelte';
 
@@ -37,6 +38,8 @@ const handlers: Record<ActionId, () => void> = {
   findNext: () => findStep(1),
   findPrev: () => findStep(-1),
   searchProject: () => openProjectSearch(),
+  toggleLeftPanel: () => togglePanel('left'),
+  toggleRightPanel: () => togglePanel('right'),
   settings: () => (settings.open = true),
   help: () => (app.showHelp = !app.showHelp),
 };

@@ -3,6 +3,7 @@
   import { app } from '../state.svelte';
   import { settings } from '../app-settings.svelte';
   import CommitDialog from './CommitDialog.svelte';
+  import PanelToggle from './PanelToggle.svelte';
   import ReviewMenu from './ReviewMenu.svelte';
   import ToolsMenu from './ToolsMenu.svelte';
 
@@ -12,6 +13,7 @@
 </script>
 
 <header class="topbar">
+  <PanelToggle side="left" />
   <div class="seg">
     <button disabled={!app.history.length} onclick={back} title="Back (⌘[ or ⌘−)">←</button>
     <button disabled={!app.future.length} onclick={forward} title="Forward (⌘] or ⌘=)">→</button>
@@ -32,6 +34,7 @@
   <ReviewMenu />
   <button class="ghost" onclick={() => (settings.open = true)} title="Settings">⚙</button>
   <button class="ghost" onclick={() => (app.showHelp = true)} title="Keyboard shortcuts">?</button>
+  <PanelToggle side="right" />
 </header>
 
 {#if showCommit}<CommitDialog close={() => (showCommit = false)} />{/if}

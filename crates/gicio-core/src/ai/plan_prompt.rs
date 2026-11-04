@@ -1,4 +1,4 @@
-use super::{instructions_prompt, Engine, ExtraInstructions, Language};
+use super::{instructions_prompt, Engine, ExtraInstructions, Language, StepCount};
 use crate::diff::Hunk;
 use crate::domain::{CommitId, GitRef, RepoRoot};
 
@@ -13,6 +13,7 @@ pub struct PlanPromptInput<'a> {
     pub extra: &'a ExtraInstructions,
     pub hunks: &'a [Hunk],
     pub kept_titles: &'a [String],
+    pub steps: StepCount,
 }
 
 fn render_hunks(hunks: &[Hunk], max_lines: usize) -> String {
@@ -47,7 +48,7 @@ Split the hunks listed below into features, each feature into review chunks, and
 
 Rules:
 - A feature is one piece of functionality (a new capability, a bug fix, a refactoring, a dependency bump…). If the change contains several features, give each its own entry so the reviewer goes through one feature at a time; never mix two features in one chunk. A change that is really one feature is a single entry.
-- A chunk is one concern a careful reviewer can digest in about 5 minutes (typically 20-150 changed lines). A small feature is one chunk; a large one is split into several chunks. Split unrelated changes in one file into different chunks when it helps; group related hunks across files.
+- {chunk_rule}
 - Order features so that ones others build on come first. Within a feature, order chunks so understanding builds up: data types and interfaces first, then core logic, then call sites and wiring, then tests, docs, config. Generated or mechanical changes (renames, formatting) go last, as their own feature.
 - Every hunk must be covered. A large hunk that mixes separate concerns (e.g. a new file with several unrelated items) may be split across chunks with row ranges like "H3:1-40" and "H3:41-90" (rows are numbered at the left of each hunk). Split only at natural boundaries such as between functions or items, never inside one.
 - Feature and chunk "title": at most ~8 words. "summary": 1-4 sentences saying what the chunk does and what the reviewer should check (risks, invariants, edge cases).
@@ -65,6 +66,7 @@ Hunks:
         sha = input.base_commit.as_str(),
         base_ref = input.base_ref,
         language = input.language.as_str(),
+        chunk_rule = input.steps.prompt_rule(),
         instructions = instructions_prompt(input.repo, input.engine, input.extra),
     )
 }

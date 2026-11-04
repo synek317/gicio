@@ -16,5 +16,5 @@ export async function openReview(repo: string, o: StartOptions, backend: Backend
   const last = snap.chunks.find((c) => c.id === snap.lastChunk) ?? snap.chunks[0];
   if (last) go({ kind: 'chunk', id: last.id }, false);
   if (snap.notice) app.toast(snap.notice, 'info', 15000);
-  if (o.order === 'ai' && !snap.plannedByAi && snap.files.length) plan(false);
+  if (o.order === 'ai' && !snap.plannedByAi && snap.files.length) plan(false, o.steps);
 }

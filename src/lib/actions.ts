@@ -6,10 +6,11 @@ import { hunkProgress } from './progress';
 import { go } from './nav';
 import { scrollToLine } from './scroll';
 import { afterAccept } from './blank-lines';
+import { showPanel } from './panels.svelte';
 import { previewOff } from './preview';
 export { scrollToLine } from './scroll';
 import { app } from './state.svelte';
-import type { AnchorInput, Hunk, MarkStatus, SendMode, Snapshot } from './types';
+import type { AnchorInput, Hunk, MarkStatus, SendMode, Snapshot, StepCount } from './types';
 
 export async function run(p: Promise<Snapshot>): Promise<boolean> {
   try {
@@ -141,6 +142,7 @@ export function openComposer(anchored = true) {
   const anchor = anchored ? currentAnchor() : null;
   const chunk = stepOnScreen();
   if (!anchor && !chunk) return focusChat();
+  showPanel('right');
   app.rightTab = 'conversations';
   app.convScope = 'here';
   app.composer = { anchor, chunk };
@@ -148,6 +150,7 @@ export function openComposer(anchored = true) {
 
 /** Opens the conversation about the whole change. */
 export function focusChat() {
+  showPanel('right');
   app.rightTab = 'conversations';
   app.convScope = 'whole';
   app.composer = null;
@@ -157,6 +160,7 @@ export function focusChat() {
 /** Shows the history a conversation belongs to: the whole change, or what is on screen. */
 export function showConversation(t: { id: string; chunk: string | null; anchor: AnchorInput | null }) {
   app.activeThread = t.id;
+  showPanel('right');
   app.rightTab = 'conversations';
   app.convScope = !t.chunk && !t.anchor ? 'whole' : 'here';
 }
@@ -191,9 +195,11 @@ export async function askAboutSelection(mode: SendMode, body: string, allowEdits
   await startConversation(stepOnScreen(), anchor, mode, body, allowEdits);
 }
 
-export async function plan(replan: boolean) {
-  if (await run(replan ? api.replanAi() : api.planAi())) {
-    app.toast(`AI plan ready: ${app.snap?.chunks.length} chunks`);
+export async function plan(replan: boolean, steps: StepCount) {
+  if (await run(replan ? api.replanAi(steps) : api.planAi(steps))) {
+    const planned = app.snap?.chunks.length;
+    const missedTotal = steps.kind === 'exact' && planned !== steps.steps;
+    app.toast(missedTotal ? `AI plan ready: ${planned} steps instead of the ${steps.steps} you asked for` : `AI plan ready: ${planned} chunks`);
     const first = app.snap?.chunks.find((c) => app.chunkProgress(c).pending > 0) ?? app.snap?.chunks[0];
     if (first && !replan) go({ kind: 'chunk', id: first.id });
   }
@@ -216,7 +222,7 @@ export async function startOver() {
   app.future = [];
   const first = app.snap?.chunks[0];
   if (first) go({ kind: 'chunk', id: first.id }, false);
-  if (settings.value.start.order === 'ai') plan(false);
+  if (settings.value.start.order === 'ai' && app.snap) plan(false, app.snap.stepCount);
 }
 
 export function currentChunkId(): string | null {

@@ -35,6 +35,7 @@ export async function mockInvoke(cmd: string, args: Record<string, any> = {}): P
   s.findings ??= [];
   s.diffOptions ??= { ignoreWhitespace: false };
   s.stageMode ??= 'memory';
+  s.stepCount ??= { kind: 'balanced' };
   s.changes ??= [];
   const bump = () => ({ ...s, version: ++s.version, canUndo: undo.length > 0 });
   switch (cmd) {
@@ -94,6 +95,7 @@ export async function mockInvoke(cmd: string, args: Record<string, any> = {}): P
       // Pretend the AI found two features, the first one in two steps.
       s.chunks.forEach((c, i) => (c.group = i < 2 ? 'Feature one' : i < 4 ? 'Feature two' : null));
       s.plannedByAi = true;
+      s.stepCount = args.steps;
       return bump();
     case 'list_jobs':
       return fx.jobs ?? [];

@@ -1,11 +1,13 @@
 import { api, inTauri } from './api';
 import { run } from './actions';
+import { showPanel } from './panels.svelte';
 import { app } from './state.svelte';
 import type { ReviewScope, Tool } from './types';
 
 export async function reviewWithAi(scope: ReviewScope, focus: string | null = null) {
   try {
     await api.aiReview(scope, focus);
+    showPanel('right');
     app.rightTab = 'findings';
     app.toast('AI review started. Findings will appear in the Findings tab and next to the code.');
   } catch (e) {
@@ -17,7 +19,10 @@ export async function runTool(tool: Tool) {
   try {
     const msg = await api.runTool(tool);
     app.toast(msg);
-    if (tool === 'clippy' || tool === 'dotnetBuild') app.rightTab = 'findings';
+    if (tool === 'clippy' || tool === 'dotnetBuild') {
+      showPanel('right');
+      app.rightTab = 'findings';
+    }
   } catch (e) {
     app.toast(String(e), 'error');
   }

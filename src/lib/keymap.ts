@@ -27,6 +27,8 @@ export const ACTIONS = [
   { id: 'findNext', label: 'Next match', keys: ['f3', 'mod+g'] },
   { id: 'findPrev', label: 'Previous match', keys: ['shift+f3', 'mod+shift+g'] },
   { id: 'searchProject', label: 'Search the whole project', keys: ['mod+shift+f', 'alt+shift+f'] },
+  { id: 'toggleLeftPanel', label: 'Show / hide the left panel', keys: ['b', 'mod+b'] },
+  { id: 'toggleRightPanel', label: 'Show / hide the right panel', keys: ['shift+b', 'mod+shift+b'] },
   { id: 'settings', label: 'Settings', keys: ['mod+,', 'shift+,'] },
   { id: 'help', label: 'Keyboard help', keys: ['?', 'f1'] },
 ] as const;

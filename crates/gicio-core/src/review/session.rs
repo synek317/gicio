@@ -109,6 +109,7 @@ impl Session {
             summary_busy: self.summary_busy,
             planning: self.planning,
             planned_by_ai: self.state.planned_by_ai,
+            step_count: self.state.step_count,
             can_undo: !self.undo.is_empty(),
             notice: self.notice.clone(),
             last_chunk: self.state.last_chunk.clone(),
@@ -220,9 +221,10 @@ impl Session {
     /// Throws away all marks, chunks and discussions and starts with a file-by-file queue.
     pub fn reset(&mut self) {
         let st = &self.state;
-        let (stage_mode, diff_options) = (st.stage_mode, st.diff_options);
+        let (stage_mode, diff_options, step_count) = (st.stage_mode, st.diff_options, st.step_count);
         self.state = ReviewState::new(st.repo.clone(), st.base_ref.clone(), st.base_commit.clone(), st.backend.clone());
         self.state.stage_mode = stage_mode;
+        self.state.step_count = step_count;
         self.state.diff_options = diff_options;
         self.undo.clear();
         let _ = self.sync_index(None);

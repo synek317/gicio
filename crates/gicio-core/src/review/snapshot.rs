@@ -25,6 +25,7 @@ pub struct Snapshot {
     pub summary_busy: bool,
     pub planning: bool,
     pub planned_by_ai: bool,
+    pub step_count: crate::ai::StepCount,
     pub can_undo: bool,
     /// One-off message about how the change differs from the last session.
     pub notice: Option<String>,

@@ -66,6 +66,8 @@ Nothing is committed, ever. The AI only edits your working tree, and only when y
 **Reviewing**
 - One list of AI-planned steps (or plain file by file), grouped by feature, with progress everywhere;
   finished steps are struck through and stamped "Done".
+- Choose how the AI splits the change: few large steps, balanced, many small steps, or an exact number
+  of steps. Set it when starting a review or in the Review menu when re-planning.
 - Side-by-side or unified diff (added and deleted files are always unified), with syntax highlighting
   and word-level highlights of what changed inside a line. Whitespace-only changes can be ignored.
 - More context on demand: 20 more lines above or below a hunk, or the whole enclosing function
@@ -150,6 +152,8 @@ Nothing is committed, ever. The AI only edits your working tree, and only when y
   language the AI writes in (your system's language by default); your own instructions for the AI;
   preferences (default layout,
   default order, auto-advance, notes expanded, hover delay…).
+- Side panels can be resized by dragging their edge (double-click for the default width) and hidden
+  with the buttons at both ends of the top bar or `b` / `Shift+B`. Both are remembered.
 - Every keyboard shortcut can be changed, and every action has at least two of them. Modifier + arrow
   keys are left to text editing (jumping by word or line, selecting with Shift).
 

@@ -1,6 +1,6 @@
 use super::json_extract::extract_object_with_key;
 use super::plan_prompt::{build_plan_prompt, PlanPromptInput};
-use super::{run_streaming, AccessMode, AiBackend, ExtraInstructions, LogSink};
+use super::{run_streaming, AccessMode, AiBackend, ExtraInstructions, LogSink, StepCount};
 use tokio::sync::oneshot;
 use crate::diff::Hunk;
 use crate::domain::{CommitId, GitRef, RepoRoot};
@@ -18,6 +18,7 @@ pub struct PlanRequest {
     pub hunks: Vec<Hunk>,
     pub kept_titles: Vec<String>,
     pub extra: ExtraInstructions,
+    pub steps: StepCount,
 }
 
 #[derive(Deserialize)]
@@ -60,6 +61,7 @@ pub async fn plan(req: PlanRequest, log: LogSink, cancel: Option<oneshot::Receiv
         extra: &req.extra,
         hunks: &req.hunks,
         kept_titles: &req.kept_titles,
+        steps: req.steps,
     });
     let answer = run_streaming(&req.backend, &req.repo, &prompt, AccessMode::ReadOnly, log, cancel).await?;
     let value = extract_object_with_key(&answer, "features").with_context(|| format!("planner returned no JSON plan: {}", answer.chars().take(400).collect::<String>()))?;

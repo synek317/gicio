@@ -34,6 +34,7 @@ async fn main() -> anyhow::Result<()> {
                 hunks: s.files.iter().flat_map(|f| f.hunks.clone()).collect(),
                 kept_titles: vec![],
                 extra: Default::default(),
+                steps: Default::default(),
             };
             let planned = ai::plan(req, Box::new(|l| eprintln!("  | {l}")), None).await?;
             s.apply_plan(vec![], planned, true);
@@ -69,6 +70,7 @@ async fn main() -> anyhow::Result<()> {
                 hunks: s.files.iter().flat_map(|f| f.hunks.clone()).collect(),
                 kept_titles: vec![],
                 extra: Default::default(),
+                steps: Default::default(),
             };
             let planned = ai::plan(req, sink(&logs), None).await?;
             s.apply_plan(vec![], planned, true);

@@ -45,6 +45,8 @@ export interface Finding { id: string; source: 'ai' | 'clippy' | 'dotnet'; sever
 export type ReviewScope = { kind: 'all' } | { kind: 'chunk'; id: string } | { kind: 'lines'; path: string; side: Side; start: number; end: number };
 export type Tool = 'fmt' | 'clippy' | 'clippyFix' | 'dotnetFormat' | 'dotnetBuild';
 export interface Symbol { name: string; kind: number; start: number; end: number }
+/** How many review steps the AI should plan. */
+export type StepCount = { kind: 'few' | 'balanced' | 'many' } | { kind: 'exact'; steps: number };
 
 export interface Snapshot {
   version: number;
@@ -66,6 +68,7 @@ export interface Snapshot {
   summaryBusy: boolean;
   planning: boolean;
   plannedByAi: boolean;
+  stepCount: StepCount;
   canUndo: boolean;
   notice: string | null;
   lastChunk: string | null;

@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import type { SearchQuery, SearchResults, LaunchArgs, DiffOptions, FileDiff, FindingStatus, FinishAction, ReviewScope, StageMode, Symbol, Tool, AiBackend, AnchorInput, FileTexts, JobInfo, LineKey, LspStatus, MarkStatus, SendMode, Snapshot, SourceLocation, ThreadStatus } from './types';
+import type { SearchQuery, SearchResults, LaunchArgs, DiffOptions, FileDiff, FindingStatus, FinishAction, ReviewScope, StageMode, Symbol, Tool, AiBackend, AnchorInput, FileTexts, JobInfo, LineKey, LspStatus, MarkStatus, SendMode, Snapshot, SourceLocation, StepCount, ThreadStatus } from './types';
 
 export const inTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
@@ -21,8 +21,8 @@ export const api = {
   undo: () => call<Snapshot>('undo'),
   resetReview: () => call<Snapshot>('reset_review'),
   saveFile: (path: string, text: string, after: string | null) => call<Snapshot>('save_file', { path, text, after }),
-  planAi: () => call<Snapshot>('plan_ai'),
-  replanAi: () => call<Snapshot>('replan_ai'),
+  planAi: (steps: StepCount) => call<Snapshot>('plan_ai', { steps }),
+  replanAi: (steps: StepCount) => call<Snapshot>('replan_ai', { steps }),
   createThread: (chunk: string | null, anchor: AnchorInput | null, allowEdits: boolean) => call<string>('create_thread', { chunk, anchor, allowEdits }),
   sendMessage: (thread: string, body: string, mode: SendMode, allowEdits: boolean | null) => call<Snapshot>('send_message', { thread, body, mode, allowEdits }),
   listJobs: () => call<JobInfo[]>('list_jobs'),
