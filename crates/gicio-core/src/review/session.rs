@@ -333,6 +333,12 @@ impl Session {
         crate::stage::sync_index(&self.state.repo, &self.state.base_commit, &files, &self.state.marks, self.state.diff_options)
     }
 
+    /// Stages exactly the accepted lines of every changed file, whatever the stage mode.
+    pub fn stage_accepted(&self) -> Result<()> {
+        let files: Vec<&FileDiff> = self.files.iter().collect();
+        crate::stage::sync_index(&self.state.repo, &self.state.base_commit, &files, &self.state.marks, self.state.diff_options)
+    }
+
     /// Switches between keeping accepted lines in gicio and staging them. Turning staging on
     /// unstages everything first, so the index holds exactly what is accepted.
     pub fn set_stage_mode(&mut self, mode: StageMode) -> Result<()> {
@@ -440,5 +446,43 @@ impl Session {
             bail!("AI is still working on this thread");
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::CommitMessage;
+    use std::process::Command;
+
+    fn git(dir: &Path, args: &[&str]) -> String {
+        let out = Command::new("git").current_dir(dir).args(args).output().unwrap();
+        assert!(out.status.success(), "git {args:?}");
+        String::from_utf8(out.stdout).unwrap()
+    }
+
+    #[test]
+    fn stage_accepted_then_amend_adds_only_accepted_lines_to_the_last_commit() {
+        let dir = std::env::temp_dir().join(format!("gicio-test-finish-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        git(&dir, &["init", "-q"]);
+        git(&dir, &["config", "user.email", "t@t"]);
+        git(&dir, &["config", "user.name", "t"]);
+        std::fs::write(dir.join("a.rs"), "fn a() {}\n").unwrap();
+        git(&dir, &["add", "."]);
+        git(&dir, &["commit", "-qm", "base"]);
+        std::fs::write(dir.join("a.rs"), "fn a() {}\nfn kept() {}\nfn left_out() {}\n").unwrap();
+
+        let mut s = Session::open(&dir, GitRef::new("HEAD").unwrap(), AiBackend::default(), StageMode::Memory).unwrap();
+        s.set_marks(vec![LineKey { path: FilePath::new("a.rs").unwrap(), side: Side::New, line: 2 }], Some(MarkStatus::Accepted));
+        assert_eq!(git(&dir, &["diff", "--cached", "--name-only"]), "", "memory mode stages nothing by itself");
+
+        s.stage_accepted().unwrap();
+        git::amend(&s.state.repo, &CommitMessage::new("base, reviewed").unwrap()).unwrap();
+        assert_eq!(git::head_message(&s.state.repo).unwrap(), "base, reviewed");
+        assert_eq!(git(&dir, &["rev-list", "--count", "HEAD"]).trim(), "1");
+        assert_eq!(git(&dir, &["show", "HEAD:a.rs"]), "fn a() {}\nfn kept() {}\n");
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 }

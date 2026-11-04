@@ -35,6 +35,8 @@
       <button onclick={() => act(() => (showSettings = true))}>Review settings… <span class="muted">base, staging, order, AI</span></button>
       <button onclick={() => act(() => run(api.refresh()))}>Reload from disk <kbd>r</kbd></button>
       <hr />
+      <button onclick={() => act(() => (app.showFinish = true))}>Finish review… <span class="muted">stage, commit or amend, then close</span></button>
+      <hr />
       <button onclick={() => act(startOver)}>Start over <span class="muted">discard marks and conversations</span></button>
       <button onclick={() => act(otherRepo)}>Open another repository…</button>
     </div>

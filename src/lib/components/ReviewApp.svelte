@@ -12,6 +12,14 @@
   import { app } from '../state.svelte';
 
   const v = $derived(app.view);
+
+  // Offer to wrap up when the last change gets accepted (not when an already finished review opens).
+  let wasFinished = app.finished;
+  $effect(() => {
+    const finished = app.finished;
+    if (finished && !wasFinished) app.showFinish = true;
+    wasFinished = finished;
+  });
 </script>
 
 <div class="app layout-{app.layout}">

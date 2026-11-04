@@ -147,6 +147,13 @@ class AppState {
   laterThreads = $derived((this.snap?.threads ?? []).filter((t) => t.status === 'deferred'));
   /** Anything put off: lines or conversations. */
   hasLater = $derived(this.overall.deferred > 0 || this.laterThreads.length > 0);
+  /** Every changed line accepted, nothing left for later and the AI idle: the review is done. */
+  finished = $derived(
+    !!this.snap && this.overall.total > 0 && this.overall.pending === 0 && !this.hasLater && !this.snap.planning
+      && this.pendingChanges.length === 0 && !this.snap.threads.some((t) => t.busy),
+  );
+  /** The "review finished" dialog. */
+  showFinish = $state(false);
 
   /** `${path}|${side}|${line}` -> AI notes from the plan. */
   noteLines = $derived.by(() => {

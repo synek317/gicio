@@ -2,6 +2,7 @@ use crate::jobs::{run_ai_job, JobKind};
 use crate::publish::{err, publish};
 use crate::state::AppState;
 use gicio_core::ai::{self, AccessMode};
+use gicio_core::domain::CommitMessage;
 use gicio_core::git;
 use gicio_core::review::Snapshot;
 use tauri::{AppHandle, State};
@@ -27,12 +28,9 @@ pub async fn suggest_commit_message(app: AppHandle, state: State<'_, AppState>) 
 
 /// Commits what is staged (in index mode: exactly the accepted lines).
 #[tauri::command]
-pub fn commit(app: AppHandle, state: State<'_, AppState>, message: String) -> Result<(String, Snapshot), String> {
+pub fn commit(app: AppHandle, state: State<'_, AppState>, message: CommitMessage) -> Result<(String, Snapshot), String> {
     let mut s = state.session()?;
-    if message.trim().is_empty() {
-        return Err("empty commit message".into());
-    }
-    let sha = git::commit(&s.state.repo, message.trim()).map_err(err)?;
+    let sha = git::commit(&s.state.repo, &message).map_err(err)?;
     s.touch();
     Ok((sha, publish(&app, &s)))
 }

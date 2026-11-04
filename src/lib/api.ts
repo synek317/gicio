@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import type { SearchQuery, SearchResults, LaunchArgs, DiffOptions, FileDiff, FindingStatus, ReviewScope, StageMode, Symbol, Tool, AiBackend, AnchorInput, FileTexts, JobInfo, LineKey, LspStatus, MarkStatus, SendMode, Snapshot, SourceLocation, ThreadStatus } from './types';
+import type { SearchQuery, SearchResults, LaunchArgs, DiffOptions, FileDiff, FindingStatus, FinishAction, ReviewScope, StageMode, Symbol, Tool, AiBackend, AnchorInput, FileTexts, JobInfo, LineKey, LspStatus, MarkStatus, SendMode, Snapshot, SourceLocation, ThreadStatus } from './types';
 
 export const inTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
@@ -43,6 +43,10 @@ export const api = {
   stagedStat: () => call<string>('staged_stat'),
   suggestCommitMessage: () => call<string>('suggest_commit_message'),
   commit: (message: string) => call<[string, Snapshot]>('commit', { message }),
+  stageAccepted: () => call<void>('stage_accepted'),
+  lastCommitMessage: () => call<string>('last_commit_message'),
+  finishReview: (action: FinishAction, message: string | null) => call<[string, Snapshot]>('finish_review', { action, message }),
+  quitApp: () => call<void>('quit_app'),
   runTool: (tool: Tool) => call<string>('run_tool', { tool }),
   setDiffOptions: (options: DiffOptions) => call<Snapshot>('set_diff_options', { options }),
   setStageMode: (mode: StageMode) => call<Snapshot>('set_stage_mode', { mode }),

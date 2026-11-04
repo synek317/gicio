@@ -334,6 +334,9 @@ label.choice.disabled { opacity: 0.5; }
 .menu.dropdown { position: absolute; top: 30px; right: 0; z-index: 90; }
 .commit-dialog { width: 640px; display: flex; flex-direction: column; gap: 10px; }
 .commit-dialog h2 { margin: 0; }
+.finish-dialog { width: 560px; display: flex; flex-direction: column; gap: 10px; }
+.finish-dialog h2, .finish-dialog p { margin: 0; }
+.finish-dialog fieldset { border: 0; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
 .line.added .ichg { background: color-mix(in srgb, var(--ok) 32%, transparent); border-radius: 2px; }
 .line.removed .ichg { background: color-mix(in srgb, var(--err) 32%, transparent); border-radius: 2px; }
 .line.expanded { opacity: 0.75; }

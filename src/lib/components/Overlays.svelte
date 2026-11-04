@@ -5,6 +5,7 @@
   import BlankLinesPrompt from './BlankLinesPrompt.svelte';
   import RenameDialog from './RenameDialog.svelte';
   import LspPrompt from './LspPrompt.svelte';
+  import FinishDialog from './FinishDialog.svelte';
 
   const MOUSE = [
     ['click gutter', 'select a line; shift-click range; ⌘-click toggle; drag to select'],
@@ -54,6 +55,7 @@
 {#if app.blankPrompt}<BlankLinesPrompt />{/if}
 {#if app.rename}<RenameDialog />{/if}
 {#if lspPromptShown()}<LspPrompt />{/if}
+{#if app.showFinish && app.snap}<FinishDialog />{/if}
 
 <div class="toasts">
   {#each app.toasts as t (t.id)}

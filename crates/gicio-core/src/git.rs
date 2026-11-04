@@ -1,6 +1,6 @@
 //! Thin wrappers around the `git` CLI.
 
-use crate::domain::{CommitId, FilePath, GitRef, RepoRoot, TreeId};
+use crate::domain::{CommitId, CommitMessage, FilePath, GitRef, RepoRoot, TreeId};
 use crate::process::sync_command;
 use anyhow::{bail, Context, Result};
 use std::path::{Path, PathBuf};
@@ -161,9 +161,21 @@ pub fn staged_stat(root: &RepoRoot) -> Result<String> {
     git_str(root.path(), &["diff", "--cached", "--stat"])
 }
 
-pub fn commit(root: &RepoRoot, message: &str) -> Result<String> {
-    git_with_input(root.path(), &["commit", "-q", "-F", "-"], message.as_bytes())?;
+/// Commits what is staged; returns the short SHA of the new commit.
+pub fn commit(root: &RepoRoot, message: &CommitMessage) -> Result<String> {
+    git_with_input(root.path(), &["commit", "-q", "-F", "-"], message.as_str().as_bytes())?;
     git_str(root.path(), &["rev-parse", "--short", "HEAD"])
+}
+
+/// Replaces the last commit with one that also has what is staged, under `message`.
+pub fn amend(root: &RepoRoot, message: &CommitMessage) -> Result<String> {
+    git_with_input(root.path(), &["commit", "-q", "--amend", "-F", "-"], message.as_str().as_bytes())?;
+    git_str(root.path(), &["rev-parse", "--short", "HEAD"])
+}
+
+/// Full message of the last commit.
+pub fn head_message(root: &RepoRoot) -> Result<String> {
+    git_str(root.path(), &["log", "-1", "--format=%B", "HEAD"])
 }
 
 /// Cheap fingerprint of the changed part of the working tree (names, sizes, modification times of

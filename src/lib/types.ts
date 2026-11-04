@@ -36,6 +36,8 @@ export interface JobInfo { id: string; kind: JobKind; status: JobStatus; title: 
 /** `ask`: the AI answers now; `later`: left for the "resolve later" step. */
 export type SendMode = 'ask' | 'later';
 export type StageMode = 'memory' | 'index';
+/** What to do with the accepted changes once the review is finished. */
+export type FinishAction = 'nothing' | 'stage' | 'commit' | 'amend';
 export interface DiffOptions { ignoreWhitespace: boolean }
 export type Severity = 'error' | 'warning' | 'info';
 export type FindingStatus = 'open' | 'fixing' | 'fixed' | 'dismissed';

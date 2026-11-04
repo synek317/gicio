@@ -143,6 +143,13 @@ export async function mockInvoke(cmd: string, args: Record<string, any> = {}): P
       return 'Add mock commit message\n\nBody.';
     case 'commit':
       return ['abc1234', bump()];
+    case 'stage_accepted':
+    case 'quit_app':
+      return null;
+    case 'last_commit_message':
+      return 'Previous mock commit\n\nBody.';
+    case 'finish_review':
+      return [`Mock: ${args.action}`, bump()];
     case 'set_stage_mode':
       s.stageMode = args.mode;
       return bump();
