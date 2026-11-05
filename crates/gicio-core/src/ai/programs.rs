@@ -5,7 +5,7 @@ use std::ffi::OsString;
 use std::path::PathBuf;
 use std::sync::OnceLock;
 
-fn home() -> PathBuf {
+pub(super) fn home() -> PathBuf {
     std::env::home_dir().unwrap_or_default()
 }
 

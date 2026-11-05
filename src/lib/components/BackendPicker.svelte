@@ -7,11 +7,11 @@
 
   let { form = $bindable() }: { form: BackendForm } = $props();
 
-  /** Known models; whatever the installed CLI lists in its help comes first. */
+  /** Known models, for when the CLI says nothing; whatever the installed CLI names comes first. */
   const MODELS: Record<BackendKind, string[]> = {
     claude: ['fable', 'opus', 'sonnet', 'haiku'],
-    codex: ['gpt-5-codex', 'gpt-5'],
-    copilot: ['claude-sonnet-4.5', 'gpt-5'],
+    codex: ['gpt-6.1-sol', 'gpt-6-astra', 'gpt-6.1-terra', 'gpt-6-sol', 'gpt-6-luna', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna'],
+    copilot: ['claude-sonnet-4.5', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna'],
     custom: [],
   };
   let detected = $state<Partial<Record<BackendKind, string[]>>>({});
@@ -20,7 +20,9 @@
     if (kind === 'custom' || detected[kind]) return;
     api.aiModels(kind).then((m) => (detected = { ...detected, [kind]: m })).catch(() => {});
   });
-  const models = $derived([...new Set([...(detected[form.kind] ?? []), ...MODELS[form.kind]])]);
+  // Codex gives the full list for the account, so models it dropped must not linger; the help of the
+  // other CLIs only names examples.
+  const models = $derived(form.kind === 'codex' && detected.codex?.length ? detected.codex : [...new Set([...(detected[form.kind] ?? []), ...MODELS[form.kind]])]);
   const languages = languageOptions();
   const EFFORTS: Effort[] = ['low', 'medium', 'high', 'xhigh', 'max'];
 

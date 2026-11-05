@@ -21,8 +21,8 @@ fn begin(app: &AppHandle, state: &AppState, replan: bool, steps: StepCount) -> R
     let skip = state.settings.skip_filter();
     let (skipped, hunks): (Vec<_>, Vec<_>) = s.files.iter().flat_map(|f| f.hunks.iter()).filter(|h| wanted.as_ref().is_none_or(|w| w.contains(&h.id))).cloned().partition(|h| skip.skips(&h.path));
     let skipped: Vec<HunkId> = skipped.into_iter().map(|h| h.id).collect();
-    // Kept steps and the step for skipped files count towards an exact number of steps.
-    let taken = keep.len() + usize::from(!skipped.is_empty());
+    // Kept steps and the step for skipped files count towards a number of steps the reviewer named.
+    let existing_steps = keep.len() + usize::from(!skipped.is_empty());
     let req = PlanRequest {
         backend: s.state.backend.clone(),
         repo: s.state.repo.clone(),
@@ -31,7 +31,9 @@ fn begin(app: &AppHandle, state: &AppState, replan: bool, steps: StepCount) -> R
         hunks,
         kept_titles: keep.iter().map(|c| c.title.clone()).collect(),
         extra: state.settings.instructions(),
-        steps: steps.remaining_after(taken),
+        steps: steps.clone(),
+        existing_steps,
+        intent: s.state.intent.clone(),
     };
     s.state.step_count = steps;
     s.planning = true;

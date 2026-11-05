@@ -26,6 +26,7 @@ pub enum JobKind {
     Summary,
     Review,
     AiReview,
+    IntentCheck,
     Fix,
     Commit,
     Tool,

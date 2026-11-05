@@ -21,34 +21,36 @@ impl Session {
     /// Replaces the open AI findings for `paths` with a new review's results.
     pub fn add_ai_findings(&mut self, raw: Vec<RawFinding>, paths: &HashSet<FilePath>) -> usize {
         self.state.findings.retain(|f| !(f.source == FindingSource::Ai && f.status == FindingStatus::Open && paths.contains(&f.path)));
-        let mut n = 0;
-        for r in raw {
-            let Ok(path) = FilePath::new(r.path.trim_start_matches("./")) else { continue };
-            if !self.changed(&path) {
-                continue;
-            }
-            let side = if r.side.as_deref() == Some("old") { Side::Old } else { Side::New };
-            let (line, end_line) = (r.line.max(1), r.end_line.unwrap_or(r.line).max(r.line.max(1)));
-            let code = self.excerpt_of(&path, side, line, end_line);
-            let id = self.state.next_finding_id();
-            self.state.findings.push(Finding {
-                id,
-                source: FindingSource::Ai,
-                severity: severity(r.severity.as_deref()),
-                path,
-                side,
-                line,
-                end_line,
-                title: r.title,
-                detail: r.detail,
-                status: crate::review::FindingStatus::Open,
-                code,
-                outdated: false,
-            });
-            n += 1;
-        }
+        let n = raw.iter().filter(|r| self.add_raw_finding(FindingSource::Ai, r)).count();
         self.touch();
         n
+    }
+
+    /// Adds what the AI reported, unless it is about a file outside the change.
+    pub(super) fn add_raw_finding(&mut self, source: FindingSource, r: &RawFinding) -> bool {
+        let Ok(path) = FilePath::new(r.path.trim_start_matches("./")) else { return false };
+        if !self.changed(&path) {
+            return false;
+        }
+        let side = if r.side.as_deref() == Some("old") { Side::Old } else { Side::New };
+        let (line, end_line) = (r.line.max(1), r.end_line.unwrap_or(r.line).max(r.line.max(1)));
+        let code = self.excerpt_of(&path, side, line, end_line);
+        let id = self.state.next_finding_id();
+        self.state.findings.push(Finding {
+            id,
+            source,
+            severity: severity(r.severity.as_deref()),
+            path,
+            side,
+            line,
+            end_line,
+            title: r.title.clone(),
+            detail: r.detail.clone(),
+            status: FindingStatus::Open,
+            code,
+            outdated: false,
+        });
+        true
     }
 
     /// Replaces all findings of a tool (clippy, dotnet build); only those in changed files are kept.

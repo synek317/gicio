@@ -178,6 +178,13 @@ pub fn head_message(root: &RepoRoot) -> Result<String> {
     git_str(root.path(), &["log", "-1", "--format=%B", "HEAD"])
 }
 
+/// Messages of the commits on top of `base`, oldest first, without merges (at most the last 200).
+pub fn commit_messages(root: &RepoRoot, base: &CommitId) -> Result<Vec<String>> {
+    let range = format!("{}..HEAD", base.as_str());
+    let raw = git(root.path(), &["log", "--reverse", "--no-merges", "-n", "200", "--format=%B%x00", &range])?;
+    Ok(raw.split(|b| *b == 0).map(|m| String::from_utf8_lossy(m).trim().to_string()).filter(|m| !m.is_empty()).collect())
+}
+
 /// Cheap fingerprint of the changed part of the working tree (names, sizes, modification times of
 /// files differing from `base`, plus untracked files). Staging does not affect it.
 pub fn worktree_fingerprint(root: &RepoRoot, base: &CommitId) -> Result<u64> {

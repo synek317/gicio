@@ -1,4 +1,5 @@
 use crate::diff::{Hunk, LineKind};
+use crate::review::{HunkRef, Session};
 
 /// A hunk with old and new line numbers in front of every line, so the AI can point at lines.
 pub fn numbered_hunk(h: &Hunk, lines: &[crate::diff::DiffLine], max: usize) -> String {
@@ -16,4 +17,10 @@ pub fn numbered_hunk(h: &Hunk, lines: &[crate::diff::DiffLine], max: usize) -> S
         out.push_str(&format!("... ({} more lines)\n", lines.len() - max));
     }
     out
+}
+
+/// The hunks of `scope` with line numbers, each shortened as far as needed to fit `budget` characters.
+pub fn numbered_diff(s: &Session, scope: &[HunkRef], budget: usize) -> String {
+    let render = |max: usize| scope.iter().filter_map(|r| s.hunk(&r.id).map(|h| numbered_hunk(h, r.lines(h), max))).collect::<String>();
+    [400, 120, 30].iter().map(|m| render(*m)).find(|d| d.len() <= budget).unwrap_or_else(|| render(10))
 }

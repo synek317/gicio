@@ -4,6 +4,7 @@ import { defaultKeybindings, type Keybindings } from './keymap';
 import { systemLanguage } from './languages';
 import { defaultPanelPrefs, type PanelPrefs } from './panel-prefs';
 import { defaultStartOptions, type StartOptions } from './start-options';
+import { upgradeStepCount } from './step-count';
 
 export interface Prefs {
   layout: 'split' | 'unified';
@@ -77,9 +78,10 @@ function merge(raw: Partial<AppSettings> | null): AppSettings {
   if (!raw) return d;
   // Older settings kept the review order among the preferences.
   const legacyOrder = (raw.prefs as { order?: 'ai' | 'files' } | undefined)?.order;
+  const start = { ...d.start, ...(legacyOrder ? { order: legacyOrder } : {}), ...raw.start };
   return {
     defaultBackend: { ...d.defaultBackend, ...raw.defaultBackend },
-    start: { ...d.start, ...(legacyOrder ? { order: legacyOrder } : {}), ...raw.start },
+    start: { ...start, steps: upgradeStepCount(start.steps) },
     skipStartScreen: raw.skipStartScreen ?? false,
     aiInstructions: raw.aiInstructions ?? '',
     skipLowValue: raw.skipLowValue ?? true,

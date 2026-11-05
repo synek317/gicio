@@ -35,6 +35,8 @@ async fn main() -> anyhow::Result<()> {
                 kept_titles: vec![],
                 extra: Default::default(),
                 steps: Default::default(),
+                existing_steps: 0,
+                intent: s.state.intent.clone(),
             };
             let planned = ai::plan(req, Box::new(|l| eprintln!("  | {l}")), None).await?;
             s.apply_plan(vec![], planned, true);
@@ -71,6 +73,8 @@ async fn main() -> anyhow::Result<()> {
                 kept_titles: vec![],
                 extra: Default::default(),
                 steps: Default::default(),
+                existing_steps: 0,
+                intent: s.state.intent.clone(),
             };
             let planned = ai::plan(req, sink(&logs), None).await?;
             s.apply_plan(vec![], planned, true);
@@ -199,6 +203,25 @@ async fn main() -> anyhow::Result<()> {
             }
             println!("{n} findings");
             s.save()?;
+        }
+        Some("intent") => {
+            // intent [<task>]: checks the change against the task (default: the commit messages).
+            if let Some(task) = args.get(3) {
+                s.set_intent(Some(gicio_core::domain::ChangeIntent::new(task)?))?;
+            }
+            let signature = gicio_core::review::line_signature(&s.files);
+            let prompt = ai::build_intent_check_prompt(&s, &Default::default(), &Default::default());
+            let answer = ai::run(&backend, &s.state.repo, &prompt, AccessMode::ReadOnly).await?;
+            let raw = ai::parse_intent_check(&answer).ok_or_else(|| anyhow::anyhow!("unparsable: {answer}"))?;
+            println!("{:?}", s.apply_intent_check(raw, signature));
+            for r in s.requirements() {
+                println!("[{:?}] {} — {} {:?}", r.verdict, r.text, r.note, r.evidence.iter().map(|e| format!("{}:{}", e.path, e.line)).collect::<Vec<_>>());
+            }
+            for f in &s.state.findings {
+                println!("[{:?}] {}:{} {} — {}", f.source, f.path, f.line, f.title, f.detail);
+            }
+            s.save()?;
+            return Ok(());
         }
         Some("edit") => {
             let path = gicio_core::domain::FilePath::new("src/main.rs")?;

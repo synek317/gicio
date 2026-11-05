@@ -19,6 +19,8 @@ pub struct Session {
     pub planning: bool,
     pub chat_busy: bool,
     pub summary_busy: bool,
+    pub checking_intent: bool,
+    pub intent_error: Option<String>,
     pub notice: Option<String>,
     version: u64,
     undo: Vec<Vec<(LineKey, Option<Mark>)>>,
@@ -72,7 +74,7 @@ impl Session {
         state.base_commit = commit;
         state.stage_mode = stage_mode;
         state.threads.iter_mut().for_each(|t| t.busy = false);
-        let mut session = Session { state, files: Vec::new(), planning: false, chat_busy: false, summary_busy: false, notice, version: 0, undo: Vec::new(), store_path };
+        let mut session = Session { state, files: Vec::new(), planning: false, chat_busy: false, summary_busy: false, checking_intent: false, intent_error: None, notice, version: 0, undo: Vec::new(), store_path };
         if resumed {
             session.install_files(files, None);
         } else {
@@ -80,6 +82,8 @@ impl Session {
             session.apply_plan(Vec::new(), fallback_plan(&session.files), false);
             session.state.line_signature = signature;
         }
+        session.sync_commit_intent();
+        session.reopen_interrupted_requirements();
         if stage_mode == StageMode::Index {
             if !was_staging {
                 git::unstage_all(&session.state.repo)?;
@@ -87,6 +91,18 @@ impl Session {
             session.sync_index(None)?;
         }
         session.save()?;
+        Ok(session)
+    }
+
+    /// Like `open`, but ignores what is stored for this scope: the previous review is moved aside,
+    /// neither continued nor deleted.
+    pub fn open_fresh(path: &Path, base: GitRef, backend: AiBackend, stage_mode: StageMode) -> Result<Self> {
+        let root = git::toplevel(path)?;
+        let commit = git::resolve_commit(&root, &base)?;
+        let legacy = store::archive(&store::legacy_path(&root, &commit)?)?;
+        let archived = store::archive(&store::path_for(&root, &StoreKey::for_base(&base))?)?.or(legacy);
+        let mut session = Self::open(path, base, backend, stage_mode)?;
+        session.notice = archived.map(|p| format!("Started fresh. The previous review is kept in {}.", p.display()));
         Ok(session)
     }
 
@@ -109,13 +125,19 @@ impl Session {
             summary_busy: self.summary_busy,
             planning: self.planning,
             planned_by_ai: self.state.planned_by_ai,
-            step_count: self.state.step_count,
+            step_count: self.state.step_count.clone(),
             can_undo: !self.undo.is_empty(),
             notice: self.notice.clone(),
             last_chunk: self.state.last_chunk.clone(),
             diff_options: self.state.diff_options,
             stage_mode: self.state.stage_mode,
             instructions: crate::ai::discover_instructions(&self.state.repo, &self.state.backend.engine),
+            intent: self.state.intent.clone(),
+            requirements: self.requirements().to_vec(),
+            intent_checked: self.state.intent_check.is_some(),
+            intent_stale: self.intent_stale(),
+            checking_intent: self.checking_intent,
+            intent_error: self.intent_error.clone(),
         }
     }
 
@@ -221,8 +243,10 @@ impl Session {
     /// Throws away all marks, chunks and discussions and starts with a file-by-file queue.
     pub fn reset(&mut self) {
         let st = &self.state;
-        let (stage_mode, diff_options, step_count) = (st.stage_mode, st.diff_options, st.step_count);
+        let (stage_mode, diff_options, step_count, intent) = (st.stage_mode, st.diff_options, st.step_count.clone(), st.intent.clone());
         self.state = ReviewState::new(st.repo.clone(), st.base_ref.clone(), st.base_commit.clone(), st.backend.clone());
+        self.state.intent = intent;
+        self.intent_error = None;
         self.state.stage_mode = stage_mode;
         self.state.step_count = step_count;
         self.state.diff_options = diff_options;
@@ -461,6 +485,39 @@ mod tests {
         let out = Command::new("git").current_dir(dir).args(args).output().unwrap();
         assert!(out.status.success(), "git {args:?}");
         String::from_utf8(out.stdout).unwrap()
+    }
+
+    #[test]
+    fn opening_fresh_moves_the_stored_review_aside_instead_of_continuing_it() {
+        let dir = std::env::temp_dir().join(format!("gicio-test-fresh-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        git(&dir, &["init", "-q"]);
+        git(&dir, &["config", "user.email", "t@t"]);
+        git(&dir, &["config", "user.name", "t"]);
+        std::fs::write(dir.join("a.rs"), "fn a() {}\n").unwrap();
+        git(&dir, &["add", "."]);
+        git(&dir, &["commit", "-qm", "base"]);
+        std::fs::write(dir.join("a.rs"), "fn a() {}\nfn b() {}\n").unwrap();
+        let head = || GitRef::new("HEAD").unwrap();
+        let key = LineKey { path: FilePath::new("a.rs").unwrap(), side: Side::New, line: 2 };
+
+        let mut s = Session::open(&dir, head(), AiBackend::default(), StageMode::Memory).unwrap();
+        s.set_marks(vec![key.clone()], Some(MarkStatus::Accepted));
+        s.save().unwrap();
+        let resumed = Session::open(&dir, head(), AiBackend::default(), StageMode::Memory).unwrap();
+        assert_eq!(resumed.state.marks.status(&key), Some(MarkStatus::Accepted));
+
+        let fresh = Session::open_fresh(&dir, head(), AiBackend::default(), StageMode::Memory).unwrap();
+        assert_eq!(fresh.state.marks.status(&key), None);
+        let kept = fresh.notice.clone().unwrap();
+        let kept = kept.trim_start_matches("Started fresh. The previous review is kept in ").trim_end_matches('.');
+        assert!(store::load(Path::new(kept)).unwrap().unwrap().marks.status(&key).is_some());
+
+        let nothing_stored = dir.join(".git/gicio");
+        std::fs::remove_dir_all(nothing_stored).unwrap();
+        assert!(Session::open_fresh(&dir, head(), AiBackend::default(), StageMode::Memory).unwrap().notice.is_none());
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 
     #[test]

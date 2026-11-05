@@ -1,6 +1,8 @@
+use super::intent_section::intent_section;
 use super::{instructions_prompt, Engine, ExtraInstructions, Language, StepCount};
 use crate::diff::Hunk;
 use crate::domain::{CommitId, GitRef, RepoRoot};
+use crate::review::Intent;
 
 const BUDGET_CHARS: usize = 350_000;
 
@@ -13,7 +15,9 @@ pub struct PlanPromptInput<'a> {
     pub extra: &'a ExtraInstructions,
     pub hunks: &'a [Hunk],
     pub kept_titles: &'a [String],
-    pub steps: StepCount,
+    pub steps: &'a StepCount,
+    pub existing_steps: usize,
+    pub intent: Option<&'a Intent>,
 }
 
 fn render_hunks(hunks: &[Hunk], max_lines: usize) -> String {
@@ -43,7 +47,7 @@ pub fn build_plan_prompt(input: &PlanPromptInput) -> String {
         r#"You are helping a human review a large code change, quite possibly written by an AI agent.
 Repository: {repo}
 The change under review = the working tree compared to base commit {sha} ({base_ref}).
-
+{intent}
 Split the hunks listed below into features, each feature into review chunks, and order them.
 
 Rules:
@@ -66,7 +70,8 @@ Hunks:
         sha = input.base_commit.as_str(),
         base_ref = input.base_ref,
         language = input.language.as_str(),
-        chunk_rule = input.steps.prompt_rule(),
+        intent = intent_section(input.intent),
+        chunk_rule = input.steps.prompt_rule(input.existing_steps),
         instructions = instructions_prompt(input.repo, input.engine, input.extra),
     )
 }

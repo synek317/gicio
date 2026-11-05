@@ -1,5 +1,7 @@
-//! Which models an AI CLI accepts, read from what its `--help` says about `--model`.
+//! Which models an AI CLI accepts: Codex stores the list for the account, the others name some in
+//! what their `--help` says about `--model`.
 
+use super::codex_models;
 use super::{login_path, resolve_program};
 use crate::process::async_command;
 use std::time::Duration;
@@ -12,8 +14,13 @@ fn help_args(program: &str) -> &'static [&'static str] {
     }
 }
 
-/// Models the installed CLI names in its help; empty when it is missing or names none.
+/// Models the installed CLI knows about; empty when it is missing or names none.
 pub async fn detect_models(program: &str) -> Vec<String> {
+    if program == "codex"
+        && let Some(models) = codex_models::cached_models()
+    {
+        return models;
+    }
     let Some(bin) = resolve_program(program) else { return Vec::new() };
     let help = async_command(bin).args(help_args(program)).env("PATH", login_path()).output();
     match tokio::time::timeout(Duration::from_secs(5), help).await {
@@ -48,7 +55,7 @@ pub fn models_in_help(help: &str) -> Vec<String> {
     found
 }
 
-fn is_model_name(s: &str) -> bool {
+pub(super) fn is_model_name(s: &str) -> bool {
     s.len() < 60 && s.chars().any(|c| c.is_ascii_alphabetic()) && s.chars().all(|c| c.is_ascii_alphanumeric() || "-._:/".contains(c))
 }
 

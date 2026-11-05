@@ -1,10 +1,10 @@
 //! The AI as a reviewer: it reads (part of) the change and reports findings anchored to lines.
 
 use super::json_extract::extract_object_with_key;
-use super::numbered::numbered_hunk;
+use super::numbered::numbered_diff;
 use super::overview::change_overview;
 use super::{instructions_prompt, ExtraInstructions};
-use crate::review::{HunkRef, Session};
+use crate::review::{FindingSource, HunkRef, Session};
 use serde::Deserialize;
 
 const BUDGET: usize = 250_000;
@@ -12,10 +12,7 @@ const BUDGET: usize = 250_000;
 pub fn build_ai_review_prompt(s: &Session, scope: &[HunkRef], focus: Option<&str>, extra: &ExtraInstructions) -> String {
     let mut out = String::from("You are a strict senior code reviewer. Review the code change below, which may have been written by an AI agent.\n");
     out.push_str(&change_overview(s));
-    let render = |max: usize| {
-        scope.iter().filter_map(|r| s.hunk(&r.id).map(|h| numbered_hunk(h, r.lines(h), max))).collect::<String>()
-    };
-    let diff = [400, 120, 30].iter().map(|m| render(*m)).find(|d| d.len() <= BUDGET).unwrap_or_else(|| render(10));
+    let diff = numbered_diff(s, scope, BUDGET);
     out.push_str(&format!(
         "\nThe part to review (columns: old line, new line, then the diff line):\n```\n{diff}```\n\
          You may read any file in the repository for context. Do not modify anything.\n"
@@ -66,7 +63,8 @@ pub fn build_fix_prompt(s: &Session, findings: &[crate::review::Finding], extra:
     let mut out = String::from("Fix the following problems found during code review, by editing files in the working tree.\n");
     out.push_str(&format!("Repository: {}\n\n", s.state.repo.path().display()));
     for f in findings {
-        out.push_str(&format!("- {}:{}-{} [{:?}] {}: {}\n", f.path, f.line, f.end_line, f.severity, f.title, f.detail));
+        let what = if f.source == FindingSource::Intent { " (not part of the task: fix it by undoing just this change)" } else { "" };
+        out.push_str(&format!("- {}:{}-{} [{:?}]{what} {}: {}\n", f.path, f.line, f.end_line, f.severity, f.title, f.detail));
     }
     out.push_str(&instructions_prompt(&s.state.repo, &s.state.backend.engine, extra));
     out.push_str(

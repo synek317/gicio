@@ -8,10 +8,11 @@ const DIFF_BUDGET: usize = 250_000;
 
 pub fn change_overview(s: &Session) -> String {
     let mut out = format!(
-        "Repository: {}\nThe change = working tree vs base commit {} ({}).\n\nChanged files:\n",
+        "Repository: {}\nThe change = working tree vs base commit {} ({}).\n{}\nChanged files:\n",
         s.state.repo.path().display(),
         s.state.base_commit.as_str(),
-        s.state.base_ref
+        s.state.base_ref,
+        super::intent_section::intent_section(s.state.intent.as_ref()),
     );
     for f in &s.files {
         let (add, del) = f.hunks.iter().flat_map(|h| h.lines.iter()).fold((0, 0), |(a, d), l| match l.kind {

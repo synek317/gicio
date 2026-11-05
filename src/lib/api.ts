@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import type { SearchQuery, SearchResults, LaunchArgs, DiffOptions, FileDiff, FindingStatus, FinishAction, ReviewScope, StageMode, Symbol, Tool, AiBackend, AnchorInput, FileTexts, JobInfo, LineKey, LspStatus, MarkStatus, SendMode, Snapshot, SourceLocation, StepCount, ThreadStatus } from './types';
+import type { SearchQuery, SearchResults, LaunchArgs, DiffOptions, FileDiff, FindingStatus, FinishAction, RequirementStatus, ReviewScope, StageMode, Symbol, Tool, AiBackend, AnchorInput, FileTexts, JobInfo, LineKey, LspStatus, MarkStatus, SendMode, Snapshot, SourceLocation, StepCount, ThreadStatus } from './types';
 
 export const inTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
@@ -10,7 +10,7 @@ async function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T> 
 }
 
 export const api = {
-  openSession: (repo: string, base: string, backend: AiBackend, stageMode: StageMode) => call<Snapshot>('open_session', { repo, base, backend, stageMode }),
+  openSession: (repo: string, base: string, backend: AiBackend, stageMode: StageMode, intent: string | null, fresh: boolean) => call<Snapshot>('open_session', { repo, base, backend, stageMode, intent, fresh }),
   getSession: () => call<Snapshot>('get_session'),
   launchArgs: () => call<LaunchArgs | null>('launch_args'),
   refresh: () => call<Snapshot>('refresh'),
@@ -40,6 +40,10 @@ export const api = {
   aiReview: (scope: ReviewScope, focus: string | null) => call<void>('ai_review', { scope, focus }),
   setFindingsStatus: (ids: string[], status: FindingStatus) => call<Snapshot>('set_findings_status', { ids, status }),
   fixFindings: (ids: string[]) => call<Snapshot>('fix_findings', { ids }),
+  setIntent: (intent: string | null) => call<Snapshot>('set_intent', { intent }),
+  checkIntent: () => call<Snapshot>('check_intent'),
+  setRequirementStatus: (ids: string[], status: RequirementStatus) => call<Snapshot>('set_requirement_status', { ids, status }),
+  implementRequirements: (ids: string[]) => call<Snapshot>('implement_requirements', { ids }),
   stagedStat: () => call<string>('staged_stat'),
   suggestCommitMessage: () => call<string>('suggest_commit_message'),
   commit: (message: string) => call<[string, Snapshot]>('commit', { message }),

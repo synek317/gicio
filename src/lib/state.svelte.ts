@@ -43,7 +43,7 @@ class AppState {
    *  pixels below the top of the diff scroller, so the code stays where it was on screen. */
   editing = $state<{ hunk: string; line: number | null; offset: number | null } | null>(null);
   sidebarTab = $state<'steps' | 'files' | 'search'>('steps');
-  rightTab = $state<'conversations' | 'findings'>('conversations');
+  rightTab = $state<'conversations' | 'findings' | 'task'>('conversations');
   showHelp = $state(false);
   lsp = $state<LspStatus>({ state: 'off', server: null, extensions: [], install: null });
   /** The language server prompt: shown by itself when the server is missing (`auto`), opened from the

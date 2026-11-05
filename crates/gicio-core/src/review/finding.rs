@@ -25,6 +25,8 @@ pub enum FindingSource {
     Ai,
     Clippy,
     Dotnet,
+    /// A change the task did not ask for, found by checking the change against the task.
+    Intent,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]

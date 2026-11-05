@@ -375,15 +375,10 @@ label.choice.disabled { opacity: 0.5; }
 .start-card label.toggle.remember { flex-direction: row; font-weight: normal; color: var(--fg); }
 .menu.dropdown { min-width: 300px; }
 .menu.dropdown .muted { font-size: 11px; }
-.step-count { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.step-count { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
 .step-count .seg button { padding: 3px 8px; white-space: nowrap; }
 .step-count .seg button + button { border-left: none; }
-.menu .step-count .seg button { display: inline-block; background: var(--bg); border: 1px solid var(--border); }
-.menu .step-count .seg button + button { border-left: none; }
-.menu .step-count .seg button.active { background: var(--bg3); }
-.step-total { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; white-space: nowrap; }
-.step-total input { width: 64px; padding: 3px 6px; }
-.menu-steps { display: flex; flex-direction: column; gap: 5px; padding: 5px 10px 8px; border-bottom: 1px solid var(--border); margin-bottom: 3px; }
+.step-count input { width: 100%; }
 label.choice, .settings label.choice { display: flex; flex-direction: row; align-items: flex-start; gap: 8px; font-weight: normal; cursor: pointer; }
 label.choice input { width: auto; margin-top: 3px; }
 .settings fieldset { margin-bottom: 4px; }
@@ -490,3 +485,16 @@ input.invalid, input.invalid:focus { outline-color: var(--err); border-color: va
 .search-hit mark { background: var(--find-bg); color: inherit; border-radius: 2px; }
 .search-hit:hover { background: var(--bg3); }
 .search-hit.active { background: var(--sel); }
+
+/* The task: what the change was supposed to do */
+.intent-field { display: flex; flex-direction: column; gap: 4px; }
+.intent-text { width: 100%; box-sizing: border-box; }
+.intent-load { align-self: flex-start; }
+.task-label { font-weight: 600; }
+.task-text { max-height: 200px; overflow: auto; overflow-wrap: anywhere; }
+.task-panel .row.wrap { flex-wrap: wrap; }
+.requirement .ftitle { font-weight: 600; overflow-wrap: anywhere; }
+.requirement.dismissed { opacity: 0.6; }
+.req-head { align-items: flex-start; }
+.req-note { margin: 0; overflow-wrap: anywhere; }
+.requirement .badge { align-self: flex-start; }

@@ -45,6 +45,7 @@ Gicio (roughly "GHEE-cho") is a playful, affectionate way to say "all good" in P
 
 1. Point gicio at a repository and choose what to review: **uncommitted changes** (staged, unstaged
    and new files) or **everything since a branch or commit** (e.g. an AI's branch against `main`).
+   Optionally say what the change was supposed to do, so the AI can compare the two.
 2. The AI reads the whole diff and plans **review steps**: one feature at a time, a large feature split
    into several steps (shown nested under it), ordered so that understanding builds up
    (types → logic → wiring → tests). A big hunk or a new file can be split across steps. The AI adds
@@ -66,8 +67,8 @@ Nothing is committed, ever. The AI only edits your working tree, and only when y
 **Reviewing**
 - One list of AI-planned steps (or plain file by file), grouped by feature, with progress everywhere;
   finished steps are struck through and stamped "Done".
-- Choose how the AI splits the change: few large steps, balanced, many small steps, or an exact number
-  of steps. Set it when starting a review or in the Review menu when re-planning.
+- Choose how the AI splits the change: few large steps, balanced, many small steps, or in your own
+  words ("10 steps", "as few as possible"). Set it when starting a review or in Review settings.
 - Side-by-side or unified diff (added and deleted files are always unified), with syntax highlighting
   and word-level highlights of what changed inside a line. Whitespace-only changes can be ignored.
 - More context on demand: 20 more lines above or below a hunk, or the whole enclosing function
@@ -87,14 +88,15 @@ Nothing is committed, ever. The AI only edits your working tree, and only when y
 - Sticky file bar while scrolling, with one-click "Accept file" / "Accept this part". Accepted files
   collapse, and anything accepted can be taken back ("↺ Unaccept" on a hunk, file or step, also from
   the step list). Jump between files with `f` / `Shift+F`.
-- Back / forward navigation (⌘− / ⌘+), undo for marks (`z`), "Start over" in the **Review** menu.
+- Back / forward navigation (⌘− / ⌘+), undo for marks (`z`), "Start over" in the **Review** menu
+  (discards the review's progress and goes back to the start screen).
 
 **From review to commit**
 - Optionally **stage what you accept**. Accepted lines go to the git index, including parts of files,
   and nothing else does, so you can commit exactly what you reviewed. Choose it on the start screen
   (for uncommitted changes); everything previously staged is unstaged first.
 - **Commit** dialog with an AI-suggested message for what is staged.
-- **Export** the review (progress, summary, discussions, open findings) as markdown.
+- **Export** the review (progress, summary, task and requirements, discussions, open findings) as markdown.
 
 **Talking to the AI**
 - Each step keeps its own history of conversations, and the whole change has one too; a switch at the
@@ -123,6 +125,14 @@ Nothing is committed, ever. The AI only edits your working tree, and only when y
 - Answers are instructed to be short and strictly on topic.
 
 **Catching slop**
+- **Check the change against the task**: a diff shows what was done, not what was skipped. Type or paste
+  what the change was supposed to do (the task, your prompt to the agent, an issue) or load it from a
+  file, on the start screen or in the **Task** tab; without it, the commit messages of the change are
+  used. The AI then plans and reviews with the purpose in mind, and on request splits the description
+  into requirements: each is **done**, **partly done**, **missing** or **cannot tell from the code**,
+  with links to the code. Unfinished ones have **Implement**, **Discuss** and **Dismiss**. Changes nobody
+  asked for become findings with **Undo it**. When the code changes afterwards, the panel says the result
+  may be out of date.
 - **AI review** of the whole change, one step, or selected lines. The AI acts as a strict reviewer and
   reports findings (bugs, edge cases, swallowed errors, dead code, made-up APIs…) next to the code
   and in a Findings tab, with **Fix**, **Fix all**, **Discuss** and **Dismiss**.
@@ -255,10 +265,12 @@ Run gicio inside the repository you want to review:
 gicio                          # this repository, start screen prefilled
 gicio ~/code/app --since main  # everything since main in another repository
 gicio --start                  # skip the start screen, review uncommitted changes right away
+gicio --fresh                  # ignore what is remembered: start screen with defaults, no saved review
 ```
 
 Tick "Remember these choices" on the start screen and `gicio` opens the review straight away from
-then on. Everything the start screen asks (what to review, staging, order, AI) can be changed during a
+then on. `--fresh` ignores those choices for one run without changing them. The saved review of what
+you then open is moved aside (next to it in `.git/gicio/`) instead of being continued. Everything the start screen asks (what to review, staging, order, AI) can be changed during a
 review from the **Start over ▾** menu, and the defaults in Settings → Preferences.
 
 For working on gicio itself, `npm install && npm run tauri dev` gives hot reload, and

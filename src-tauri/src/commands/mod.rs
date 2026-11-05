@@ -2,6 +2,7 @@ pub mod changes;
 pub mod chat;
 pub mod finish;
 pub mod git_ops;
+pub mod intent;
 pub mod jobs;
 pub mod launch;
 pub mod lsp;

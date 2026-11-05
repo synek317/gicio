@@ -6,7 +6,7 @@ use crate::diff::Hunk;
 use crate::domain::{CommitId, GitRef, RepoRoot};
 use super::plan_labels::parse_label;
 use crate::diff::{LineKind, Side};
-use crate::review::{HunkPart, Note, PlannedChunk, PlannedItem};
+use crate::review::{HunkPart, Intent, Note, PlannedChunk, PlannedItem};
 use anyhow::{bail, Context, Result};
 use serde::Deserialize;
 
@@ -19,6 +19,9 @@ pub struct PlanRequest {
     pub kept_titles: Vec<String>,
     pub extra: ExtraInstructions,
     pub steps: StepCount,
+    /// Steps that stay outside this plan (kept while re-planning, or for skipped files).
+    pub existing_steps: usize,
+    pub intent: Option<Intent>,
 }
 
 #[derive(Deserialize)]
@@ -61,7 +64,9 @@ pub async fn plan(req: PlanRequest, log: LogSink, cancel: Option<oneshot::Receiv
         extra: &req.extra,
         hunks: &req.hunks,
         kept_titles: &req.kept_titles,
-        steps: req.steps,
+        steps: &req.steps,
+        existing_steps: req.existing_steps,
+        intent: req.intent.as_ref(),
     });
     let answer = run_streaming(&req.backend, &req.repo, &prompt, AccessMode::ReadOnly, log, cancel).await?;
     let value = extract_object_with_key(&answer, "features").with_context(|| format!("planner returned no JSON plan: {}", answer.chars().take(400).collect::<String>()))?;

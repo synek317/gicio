@@ -39,12 +39,18 @@ pub struct ReviewState {
     /// The step the reviewer was on.
     #[serde(default)]
     pub last_chunk: Option<ChunkId>,
+    /// What the change was supposed to do.
+    #[serde(default)]
+    pub intent: Option<super::Intent>,
+    /// The last check of the change against `intent`.
+    #[serde(default)]
+    pub intent_check: Option<super::IntentCheck>,
     next_id: u64,
 }
 
 impl ReviewState {
     pub fn new(repo: RepoRoot, base_ref: GitRef, base_commit: CommitId, backend: AiBackend) -> Self {
-        Self { repo, base_ref, base_commit, backend, chunks: Vec::new(), marks: Marks::default(), threads: Vec::new(), planned_by_ai: false, step_count: Default::default(), diff_options: Default::default(), stage_mode: Default::default(), chat: Vec::new(), summary: None, findings: Vec::new(), changes: Vec::new(), line_signature: Vec::new(), last_chunk: None, next_id: 1 }
+        Self { repo, base_ref, base_commit, backend, chunks: Vec::new(), marks: Marks::default(), threads: Vec::new(), planned_by_ai: false, step_count: Default::default(), diff_options: Default::default(), stage_mode: Default::default(), chat: Vec::new(), summary: None, findings: Vec::new(), changes: Vec::new(), line_signature: Vec::new(), last_chunk: None, intent: None, intent_check: None, next_id: 1 }
     }
 
     fn next(&mut self) -> u64 {
@@ -67,5 +73,9 @@ impl ReviewState {
 
     pub fn next_finding_id(&mut self) -> super::FindingId {
         super::FindingId::new(self.next())
+    }
+
+    pub fn next_requirement_id(&mut self) -> super::RequirementId {
+        super::RequirementId::new(self.next())
     }
 }

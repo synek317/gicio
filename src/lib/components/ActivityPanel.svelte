@@ -11,7 +11,7 @@
   const recent = $derived(app.jobs.filter((j) => j.status !== 'running' && j.status !== 'queued').slice(-8).reverse());
   let show = $state(false);
   let open = $state<Record<string, boolean>>({});
-  const icon: Record<JobKind, string> = { ask: '💬', plan: '🗺', chat: '🗨', summary: '📝', review: '✉️', aiReview: '🔎', fix: '🛠', commit: '✔', tool: '⚙' };
+  const icon: Record<JobKind, string> = { ask: '💬', plan: '🗺', chat: '🗨', summary: '📝', review: '✉️', aiReview: '🔎', intentCheck: '🎯', fix: '🛠', commit: '✔', tool: '⚙' };
 
   function stop(j: JobInfo) {
     api.cancelJob(j.id).catch((e) => app.toast(String(e), 'error'));

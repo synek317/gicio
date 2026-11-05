@@ -8,6 +8,8 @@ interface Fixture { snapshot: Snapshot; texts: Record<string, FileTexts>; jobs?:
 
 let fixture: Fixture | null = null;
 let undo: Mark[][] = [];
+/** Launch arguments are handed out once, as in the backend. */
+let launchGiven = false;
 /** `?lsp=missing` (or `?lsp=noinstaller`) shows the prompt for a missing csharp-ls. */
 const lspParam = typeof location === 'undefined' ? null : new URLSearchParams(location.search).get('lsp');
 let mockLsp: LspStatus = lspParam
@@ -37,16 +39,50 @@ export async function mockInvoke(cmd: string, args: Record<string, any> = {}): P
   s.stageMode ??= 'memory';
   s.stepCount ??= { kind: 'balanced' };
   s.changes ??= [];
-  const bump = () => ({ ...s, version: ++s.version, canUndo: undo.length > 0 });
+  s.intent ??= null;
+  s.requirements ??= [];
+  s.intentChecked ??= false;
+  s.intentStale ??= false;
+  s.checkingIntent ??= false;
+  s.intentError ??= null;
+  const bump =() => ({ ...s, version: ++s.version, canUndo: undo.length > 0 });
   switch (cmd) {
     case 'open_session':
+      if (args.fresh) {
+        s.marks = [];
+        s.threads = [];
+        s.intent = null;
+        undo = [];
+      }
+      if (args.intent) s.intent = { text: args.intent, source: 'reviewer' };
+      // `?empty` simulates a repository without changes.
+      return new URLSearchParams(location.search).has('empty') ? { ...bump(), files: [], chunks: [] } : bump();
+    case 'set_intent':
+      s.intent = args.intent ? { text: args.intent, source: 'reviewer' } : null;
+      s.requirements = [];
+      s.intentChecked = false;
+      s.intentStale = false;
+      s.findings = s.findings.filter((f) => f.source !== 'intent');
+      return bump();
+    case 'check_intent':
+      mockIntentCheck(s);
+      return bump();
+    case 'set_requirement_status':
+      s.requirements = s.requirements.map((r) => (args.ids.includes(r.id) ? { ...r, status: args.status } : r));
+      return bump();
+    case 'implement_requirements':
+      s.requirements = s.requirements.map((r) => (args.ids.includes(r.id) ? { ...r, status: 'implemented' } : r));
+      s.intentStale = true;
+      return bump();
     case 'get_session':
     case 'refresh':
       return bump();
     case 'launch_args': {
-      // Simulates `gicio PATH [--since REF] [--start]` with `?repo=…&since=…&start`.
+      // Simulates `gicio PATH [--since REF] [--start] [--fresh]` with `?repo=…&since=…&start&fresh`.
       const q = new URLSearchParams(location.search);
-      return q.get('repo') ? { repo: q.get('repo'), since: q.get('since'), start: q.has('start'), warning: null } : null;
+      if (launchGiven || !q.get('repo')) return null;
+      launchGiven = true;
+      return { repo: q.get('repo'), since: q.get('since'), start: q.has('start'), fresh: q.has('fresh'), warning: null };
     }
     case 'list_refs':
       return ['main', 'HEAD~1'];
@@ -200,6 +236,22 @@ export async function mockInvoke(cmd: string, args: Record<string, any> = {}): P
     default:
       throw new Error(`mock: ${cmd} not supported`);
   }
+}
+
+/** Pretends the AI compared the change with the task, pointing at real lines of the fixture. */
+function mockIntentCheck(s: Snapshot) {
+  const added = s.files.flatMap((f) => f.hunks.flatMap((h) => h.lines.filter((l) => l.newNo != null && l.kind === 'added').map((l) => ({ path: f.path, line: l.newNo! }))));
+  const [first, second] = [added[0], added[Math.floor(added.length / 2)]];
+  s.requirements = [
+    { id: 'q1', text: 'Show the time left until the next break', verdict: 'done', note: 'The countdown is formatted and refreshed every second.', evidence: first ? [first] : [], status: 'open' },
+    { id: 'q2', text: 'Let the user pause the timer', verdict: 'partial', note: 'Pausing works, but resuming restarts the countdown from the beginning.', evidence: second ? [second] : [], status: 'open' },
+    { id: 'q3', text: 'Remember the settings between runs', verdict: 'missing', note: 'Nothing writes the settings to disk.', evidence: [], status: 'open' },
+    { id: 'q4', text: 'Use less than 1% of the CPU', verdict: 'unclear', note: 'The code cannot tell; measure it while the timer runs.', evidence: [], status: 'open' },
+  ];
+  s.intentChecked = true;
+  s.intentStale = false;
+  s.findings = s.findings.filter((f) => f.source !== 'intent');
+  if (second) s.findings.push({ id: 'f900', source: 'intent', severity: 'warning', path: second.path, side: 'new', line: second.line, endLine: second.line, title: 'Unrelated logging helper', detail: 'Adds a logging helper the task does not mention and nothing here needs.', status: 'open' });
 }
 
 /** Rough stand-in for the globs of a project search: `*.ext` by extension, anything else by substring. */

@@ -1,7 +1,31 @@
-use super::{Author, FindingStatus, MarkStatus, Session, ThreadStatus};
+use super::{Author, FindingStatus, MarkStatus, RequirementStatus, Session, ThreadStatus, Verdict};
 use crate::diff::Side;
 
-/// The review as markdown: progress, summary, discussions and open findings.
+/// The task and how far the change meets it.
+fn task_section(s: &Session) -> String {
+    let Some(intent) = &s.state.intent else { return String::new() };
+    let mut out = format!("\n## Task\n\n{}\n", intent.text);
+    if s.requirements().is_empty() {
+        return out;
+    }
+    out.push_str("\n## Requirements\n\n");
+    if s.intent_stale() {
+        out.push_str("_The code changed after this check._\n\n");
+    }
+    for r in s.requirements() {
+        let verdict = match r.verdict {
+            Verdict::Done => "done",
+            Verdict::Partial => "partial",
+            Verdict::Missing => "missing",
+            Verdict::Unclear => "unclear",
+        };
+        let dismissed = if r.status == RequirementStatus::Dismissed { ", dismissed" } else { "" };
+        out.push_str(&format!("- **{verdict}{dismissed}**: {} — {}\n", r.text, r.note.replace('\n', " ")));
+    }
+    out
+}
+
+/// The review as markdown: progress, summary, task, discussions and open findings.
 pub fn export_markdown(s: &Session) -> String {
     let st = &s.state;
     let (mut total, mut accepted, mut later) = (0, 0, 0);
@@ -24,6 +48,7 @@ pub fn export_markdown(s: &Session) -> String {
     if let Some(sum) = &st.summary {
         out.push_str(&format!("\n## Summary\n\n{}\n", sum.body));
     }
+    out.push_str(&task_section(s));
     let threads: Vec<_> = st.threads.iter().filter(|t| !t.messages.is_empty()).collect();
     if !threads.is_empty() {
         out.push_str("\n## Discussions\n");

@@ -3,7 +3,7 @@ use crate::publish::{err, publish};
 use crate::state::AppState;
 use gicio_core::ai::AiBackend;
 use gicio_core::diff::{self, FileTexts};
-use gicio_core::domain::{ChunkId, FilePath, GitRef};
+use gicio_core::domain::{ChangeIntent, ChunkId, FilePath, GitRef};
 use gicio_core::review::{Session, Snapshot};
 use gicio_core::stage::StageMode;
 use std::path::PathBuf;
@@ -12,8 +12,19 @@ use tauri::{AppHandle, State};
 const MAX_PEEK_BYTES: u64 = 4 * 1024 * 1024;
 
 #[tauri::command]
-pub async fn open_session(app: AppHandle, state: State<'_, AppState>, repo: PathBuf, base: GitRef, backend: AiBackend, stage_mode: StageMode) -> Result<Snapshot, String> {
-    let session = tauri::async_runtime::spawn_blocking(move || Session::open(&repo, base, backend, stage_mode)).await.map_err(err)?.map_err(err)?;
+pub async fn open_session(app: AppHandle, state: State<'_, AppState>, repo: PathBuf, base: GitRef, backend: AiBackend, stage_mode: StageMode, intent: Option<ChangeIntent>, fresh: bool) -> Result<Snapshot, String> {
+    let session = tauri::async_runtime::spawn_blocking(move || {
+        let open = if fresh { Session::open_fresh } else { Session::open };
+        let mut session = open(&repo, base, backend, stage_mode)?;
+        // Without a new description the review keeps the one it has.
+        if intent.is_some() {
+            session.set_intent(intent)?;
+        }
+        anyhow::Ok(session)
+    })
+    .await
+    .map_err(err)?
+    .map_err(err)?;
     let root = session.state.repo.clone();
     let base = session.state.base_commit.clone();
     let snap = publish(&app, &session);

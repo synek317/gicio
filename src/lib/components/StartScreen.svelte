@@ -2,33 +2,50 @@
   import { onMount } from 'svelte';
   import { open } from '@tauri-apps/plugin-dialog';
   import { api, inTauri } from '../api';
-  import { settings } from '../app-settings.svelte';
+  import { defaultSettings, settings } from '../app-settings.svelte';
   import type { BackendForm } from '../backend-form';
   import { openReview } from '../open-review';
   import { loadRecent, saveRecent } from '../settings';
+  import { takeStartDraft } from '../start-draft';
   import type { StartOptions } from '../start-options';
+  import { stepCountReady } from '../step-count';
   import BackendPicker from './BackendPicker.svelte';
+  import IntentField from './IntentField.svelte';
   import ReviewOptions from './ReviewOptions.svelte';
 
+  /** Set when a review was started over: its choices come back, so only what should differ needs changing. */
+  const draft = takeStartDraft();
   const recent = $state(loadRecent());
-  let options = $state<StartOptions>({ ...settings.value.start });
-  let form = $state<BackendForm>({ ...settings.value.defaultBackend });
+  if (draft) recent.repo = draft.repo;
+  let options = $state<StartOptions>({ ...(draft?.options ?? settings.value.start) });
+  /** Belongs to this one review, so unlike the options it is never remembered as a default. */
+  let intent = $state(draft?.intent ?? '');
+  let form = $state<BackendForm>({ ...(draft?.form ?? settings.value.defaultBackend) });
   let remember = $state(false);
   let opening = $state(false);
   let error = $state('');
+  /** `--fresh`: the review about to open must not continue the saved one. */
+  let fresh = false;
 
-  // `gicio [PATH] [--since REF] [--start]`: the command line wins over the defaults. With remembered
-  // defaults (or --start) the review opens right away.
+  // `gicio [PATH] [--since REF] [--start] [--fresh]`: the command line wins over the defaults. With
+  // remembered defaults (or --start) the review opens right away, unless --fresh ignores them.
   onMount(async () => {
     const args = await api.launchArgs().catch(() => null);
     if (!args) return;
+    if (args.fresh) {
+      const defaults = defaultSettings();
+      fresh = true;
+      options = defaults.start;
+      form = defaults.defaultBackend;
+      recent.repo = '';
+    }
     if (args.repo) recent.repo = args.repo;
     if (args.since) {
       options.scope = 'since';
       options.base = args.since;
     }
     if (args.warning) error = args.warning;
-    if (args.repo && (args.start || settings.value.skipStartScreen)) start();
+    if (args.repo && (args.start || (settings.value.skipStartScreen && !args.fresh))) start();
   });
 
   async function browse() {
@@ -45,9 +62,11 @@
       if (remember) {
         await settings.save({ ...settings.value, start: $state.snapshot(options), defaultBackend: $state.snapshot(form), skipStartScreen: true });
       }
-      await openReview(recent.repo, options, form);
+      // Starting over keeps the reviewer's description until now; an emptied field means to drop it.
+      if (draft?.intent && !intent.trim()) await api.setIntent(null);
+      await openReview(recent.repo, options, form, intent, fresh);
     } catch (e) {
-      error = String(e);
+      error = e instanceof Error ? e.message : String(e);
     } finally {
       opening = false;
     }
@@ -70,6 +89,10 @@
     {/if}
 
     <ReviewOptions bind:options repo={recent.repo || null} idPrefix="start" />
+    <div class="intent-field">
+      <label for="start-intent"><span>What should this change do? <span class="muted small">optional</span></span></label>
+      <IntentField id="start-intent" bind:value={intent} />
+    </div>
     <BackendPicker bind:form />
 
     <label class="toggle remember">
@@ -79,6 +102,6 @@
     </label>
 
     {#if error}<div class="error">{error}</div>{/if}
-    <button class="primary big" disabled={!recent.repo || (options.scope === 'since' && !options.base) || opening} onclick={start}>{opening ? 'Opening…' : 'Start review'}</button>
+    <button class="primary big" disabled={!recent.repo || (options.scope === 'since' && !options.base) || (options.order === 'ai' && !stepCountReady(options.steps)) || opening} onclick={start}>{opening ? 'Opening…' : 'Start review'}</button>
   </div>
 </div>

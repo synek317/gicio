@@ -30,7 +30,7 @@ export type Engine = { kind: 'claude' | 'codex' | 'copilot' } | { kind: 'custom'
 export type Effort = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 export interface AiBackend { engine: Engine; model: string | null; effort: Effort | null; language: string }
 export interface InstructionFile { path: string; kind: string; skill: [string, string] | null; native: boolean }
-export type JobKind = 'ask' | 'plan' | 'chat' | 'summary' | 'review' | 'aiReview' | 'fix' | 'commit' | 'tool';
+export type JobKind = 'ask' | 'plan' | 'chat' | 'summary' | 'review' | 'aiReview' | 'intentCheck' | 'fix' | 'commit' | 'tool';
 export type JobStatus = 'queued' | 'running' | 'done' | 'failed' | 'cancelled';
 export interface JobInfo { id: string; kind: JobKind; status: JobStatus; title: string; thread: string | null; log: string[] }
 /** `ask`: the AI answers now; `later`: left for the "resolve later" step. */
@@ -41,12 +41,20 @@ export type FinishAction = 'nothing' | 'stage' | 'commit' | 'amend';
 export interface DiffOptions { ignoreWhitespace: boolean }
 export type Severity = 'error' | 'warning' | 'info';
 export type FindingStatus = 'open' | 'fixing' | 'fixed' | 'dismissed';
-export interface Finding { id: string; source: 'ai' | 'clippy' | 'dotnet'; severity: Severity; path: string; side: Side; line: number; endLine: number; title: string; detail: string; status: FindingStatus; outdated?: boolean }
+/** What the change was supposed to do: written by the reviewer or taken from the commit messages. */
+export interface Intent { text: string; source: 'reviewer' | 'commits' }
+export type Verdict = 'done' | 'partial' | 'missing' | 'unclear';
+export type RequirementStatus = 'open' | 'implementing' | 'implemented' | 'dismissed';
+export interface CodeRef { path: string; line: number }
+/** One thing the task asks for and how far the change meets it. */
+export interface Requirement { id: string; text: string; verdict: Verdict; note: string; evidence: CodeRef[]; status: RequirementStatus }
+/** `intent`: a change the task did not ask for. */
+export interface Finding { id: string; source: 'ai' | 'clippy' | 'dotnet' | 'intent'; severity: Severity; path: string; side: Side; line: number; endLine: number; title: string; detail: string; status: FindingStatus; outdated?: boolean }
 export type ReviewScope = { kind: 'all' } | { kind: 'chunk'; id: string } | { kind: 'lines'; path: string; side: Side; start: number; end: number };
 export type Tool = 'fmt' | 'clippy' | 'clippyFix' | 'dotnetFormat' | 'dotnetBuild';
 export interface Symbol { name: string; kind: number; start: number; end: number }
 /** How many review steps the AI should plan. */
-export type StepCount = { kind: 'few' | 'balanced' | 'many' } | { kind: 'exact'; steps: number };
+export type StepCount = { kind: 'few' | 'balanced' | 'many' } | { kind: 'custom'; wish: string };
 
 export interface Snapshot {
   version: number;
@@ -73,6 +81,14 @@ export interface Snapshot {
   notice: string | null;
   lastChunk: string | null;
   instructions: InstructionFile[];
+  intent: Intent | null;
+  requirements: Requirement[];
+  /** The change was checked against the task (an empty list then means nothing could be checked). */
+  intentChecked: boolean;
+  /** The code changed since that check. */
+  intentStale: boolean;
+  checkingIntent: boolean;
+  intentError: string | null;
 }
 
 /** How a missing language server gets installed; `available` when gicio can run the installer itself. */
@@ -85,7 +101,7 @@ export type LspStatus = ({ state: 'off' | 'missing' | 'installing' | 'starting' 
   install: LspInstall | null;
 };
 export interface SourceLocation { absPath: string; repoPath: string | null; line: number; character: number; preview: string | null }
-export interface LaunchArgs { repo: string | null; since: string | null; start: boolean; warning: string | null }
+export interface LaunchArgs { repo: string | null; since: string | null; start: boolean; fresh: boolean; warning: string | null }
 export interface FileTexts { old: string; new: string; binary: boolean }
 
 /** A project search; `include` / `exclude` are comma-separated globs. */

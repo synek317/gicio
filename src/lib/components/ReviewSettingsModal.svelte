@@ -6,7 +6,7 @@
   import { openReview } from '../open-review';
   import { baseOf, optionsOf, stageOf, type StartOptions } from '../start-options';
   import { app } from '../state.svelte';
-  import { sameStepCount } from '../step-count';
+  import { sameStepCount, stepCountReady } from '../step-count';
   import BackendPicker from './BackendPicker.svelte';
   import ReviewOptions from './ReviewOptions.svelte';
 
@@ -70,7 +70,7 @@
       <label class="toggle"><input type="checkbox" bind:checked={asDefault} /> Also use as defaults for new reviews</label>
       <span class="spacer"></span>
       <button onclick={close}>Cancel</button>
-      <button class="primary" disabled={busy || (options.scope === 'since' && !options.base)} onclick={apply}>Apply</button>
+      <button class="primary" disabled={busy || (options.scope === 'since' && !options.base) || (options.order === 'ai' && !stepCountReady(options.steps))} onclick={apply}>Apply</button>
     </footer>
   </div>
 </div>

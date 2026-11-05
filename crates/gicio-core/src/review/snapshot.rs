@@ -33,4 +33,12 @@ pub struct Snapshot {
     pub diff_options: crate::diff::DiffOptions,
     pub stage_mode: crate::stage::StageMode,
     pub instructions: Vec<crate::ai::InstructionFile>,
+    pub intent: Option<super::Intent>,
+    pub requirements: Vec<super::Requirement>,
+    /// The change was checked against the task (an empty list then means nothing could be checked).
+    pub intent_checked: bool,
+    /// The code changed since that check.
+    pub intent_stale: bool,
+    pub checking_intent: bool,
+    pub intent_error: Option<String>,
 }

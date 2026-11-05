@@ -17,7 +17,10 @@ pub fn build_ask_prompt(session: &Session, thread_id: &ThreadId, extra: &ExtraIn
         st.base_ref
     );
 
+    // The overview of a review-wide request already says what the change was supposed to do.
+    let task = super::intent_section::intent_section(st.intent.as_ref());
     if let Some(chunk) = thread.chunk.as_ref().and_then(|c| session.chunk(c)) {
+        out.push_str(&task);
         out.push_str(&format!("The reviewer is looking at review chunk \"{}\": {}\n\nDiff of this chunk:\n", chunk.title, chunk.summary));
         let mut budget = MAX_CHUNK_DIFF_LINES;
         for r in &chunk.hunks {
@@ -35,6 +38,8 @@ pub fn build_ask_prompt(session: &Session, thread_id: &ThreadId, extra: &ExtraIn
         out.push_str("The reviewer's request concerns the whole change, not one place.\n");
         out.push_str(&super::overview::change_overview(session));
         out.push_str("\nRead whatever files you need.\n\n");
+    } else {
+        out.push_str(&task);
     }
 
     if let Some(a) = &thread.anchor {

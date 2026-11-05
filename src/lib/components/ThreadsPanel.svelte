@@ -1,15 +1,18 @@
 <script lang="ts">
   import { openComposer } from '../actions';
+  import { needsWork } from '../intent-actions';
   import { panelPref } from '../panels.svelte';
   import { app } from '../state.svelte';
   import { stepLabel } from '../step-labels';
   import FindingsPanel from './FindingsPanel.svelte';
   import NewThread from './NewThread.svelte';
+  import TaskPanel from './TaskPanel.svelte';
   import ThreadCard from './ThreadCard.svelte';
   import WholeChange from './WholeChange.svelte';
   import type { Thread } from '../types';
 
   const openFindings = $derived((app.snap?.findings ?? []).filter((f) => f.status === 'open').length);
+  const unmet = $derived((app.snap?.requirements ?? []).filter(needsWork).length);
   const rank = { open: 0, deferred: 1, resolved: 2 };
   const byStatus = (a: Thread, b: Thread) => rank[a.status] - rank[b.status] || Number(b.id.slice(1)) - Number(a.id.slice(1));
   let showResolved = $state(false);
@@ -51,6 +54,7 @@
     <nav class="tabs right-tabs">
       <button class:active={app.rightTab === 'conversations'} onclick={() => (app.rightTab = 'conversations')}>Conversations{#if app.snap?.chatBusy || app.snap?.threads.some((t) => t.busy)} <span class="spinner"></span>{/if}</button>
       <button class:active={app.rightTab === 'findings'} onclick={() => (app.rightTab = 'findings')}>Findings{#if openFindings} <span class="count">{openFindings}</span>{/if}</button>
+      <button class:active={app.rightTab === 'task'} onclick={() => (app.rightTab = 'task')} title="What the change was supposed to do, and whether it does">Task{#if app.snap?.checkingIntent} <span class="spinner"></span>{:else if unmet} <span class="count">{unmet}</span>{/if}</button>
     </nav>
     <span class="spacer"></span>
     {#if app.rightTab === 'conversations'}
@@ -59,6 +63,8 @@
   </header>
   {#if app.rightTab === 'findings'}
     <FindingsPanel />
+  {:else if app.rightTab === 'task'}
+    <TaskPanel />
   {:else}
     <div class="seg scope-switch">
       <button class:active={app.convScope === 'here'} onclick={() => (app.convScope = 'here')} title="Conversations about what is on screen">{hereLabel}</button>

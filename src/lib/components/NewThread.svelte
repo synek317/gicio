@@ -17,7 +17,7 @@
 
 <div class="card composer">
   <div class="row">
-    <span class="anchor muted">{#if a}On <code>{a.path}:{a.side === 'old' ? '−' : '+'}{a.start}{a.end > a.start ? `–${a.end}` : ''}</code>{:else}About the whole step{/if}</span>
+    <span class="anchor muted">{#if a}On <code>{a.path}:{a.side === 'old' ? '−' : '+'}{a.start}{a.end > a.start ? `–${a.end}` : ''}</code>{:else if app.composer?.chunk}About the whole step{:else}About the whole change{/if}</span>
     <span class="spacer"></span>
     <button class="ghost small" onclick={() => (app.composer = null)} title="Cancel (Esc)">✕</button>
   </div>

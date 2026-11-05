@@ -8,6 +8,10 @@
 
   let { finding: f, compact = false }: { finding: Finding; compact?: boolean } = $props();
   let open = $state(false);
+  /** A change the task did not ask for: fixing it means undoing it. */
+  const beyondTask = $derived(f.source === 'intent');
+  /** Text written by the AI, as opposed to the output of a tool. */
+  const prose = $derived(f.source === 'ai' || beyondTask);
 
   function discuss() {
     app.composer = { anchor: { path: f.path, side: f.side, start: f.line, end: Math.max(f.line, f.endLine) }, chunk: app.view?.kind === 'chunk' ? app.view.id : null };
@@ -21,7 +25,7 @@
   <div class="row">
     <span class="sev">{f.severity === 'error' ? '⛔' : f.severity === 'warning' ? '⚠️' : 'ℹ️'}</span>
     <strong class="ftitle">{f.title}</strong>
-    <span class="badge">{f.source}</span>
+    <span class="badge">{beyondTask ? 'beyond the task' : f.source}</span>
     {#if f.status !== 'open'}<span class="badge st-{f.status}">{f.status}</span>{/if}
     {#if f.outdated}<span class="badge outdated" title="The code this finding was about has changed or been removed">outdated</span>{/if}
   </div>
@@ -30,14 +34,14 @@
   {/if}
   {#if f.detail}
     {#if compact || open}
-      <div class="md fdetail" class:mono-detail={f.source !== 'ai'}>{#if f.source !== 'ai'}<pre>{f.detail}</pre>{:else}{@html renderMarkdown(f.detail)}{/if}</div>
+      <div class="md fdetail" class:mono-detail={!prose}>{#if !prose}<pre>{f.detail}</pre>{:else}{@html renderMarkdown(f.detail)}{/if}</div>
     {:else}
       <button class="link small" onclick={() => (open = true)}>details</button>
     {/if}
   {/if}
   {#if f.status === 'open'}
     <div class="row">
-      <button class="small primary" onclick={() => run(api.fixFindings([f.id]))} title="Queue an AI fix; the change lands as a step at the end of the queue">Fix</button>
+      <button class="small primary" onclick={() => run(api.fixFindings([f.id]))} title={beyondTask ? 'Queue an AI job to undo this change; what it does lands as a step at the end of the queue' : 'Queue an AI fix; the change lands as a step at the end of the queue'}>{beyondTask ? 'Undo it' : 'Fix'}</button>
       <button class="small" onclick={discuss}>Discuss</button>
       <button class="small ghost" onclick={() => run(api.setFindingsStatus([f.id], 'dismissed'))}>Dismiss</button>
     </div>

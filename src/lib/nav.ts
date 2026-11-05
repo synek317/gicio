@@ -14,11 +14,20 @@ function show(view: View, scroll = 0) {
   requestAnimationFrame(() => scroller()?.scrollTo({ top: scroll }));
 }
 
-function leaveEditor(): boolean {
+export function leaveEditor(): boolean {
   if ((app.view?.kind === 'source' || app.editing) && app.editorDirty && !window.confirm('Discard unsaved edits?')) return false;
   app.editorDirty = false;
   app.editing = null;
   return true;
+}
+
+/** Back to the start screen. The review stays saved; the next one to open replaces it. */
+export function leaveReview() {
+  if (!leaveEditor()) return;
+  app.snap = null;
+  app.view = null;
+  app.history = [];
+  app.future = [];
 }
 
 /** Navigates to a view; with `push` the current one is remembered for Back. */

@@ -1,4 +1,4 @@
-//! Command line: `gicio [PATH] [--since REF] [--start]`.
+//! Command line: `gicio [PATH] [--since REF] [--start] [--fresh]`.
 
 use gicio_core::domain::{GitRef, RepoRoot};
 use serde::Serialize;
@@ -8,11 +8,13 @@ use std::sync::Mutex;
 const USAGE: &str = "\
 Review huge changes with AI assist.
 
-Usage: gicio [PATH] [--since REF] [--start]
+Usage: gicio [PATH] [--since REF] [--start] [--fresh]
 
   PATH          repository to review (default: the current directory)
   --since REF   review everything since REF (a branch or commit) instead of uncommitted changes
   --start       start the review right away, skipping the start screen
+  --fresh       ignore what is remembered: show the start screen with the default choices and do
+                not continue the saved review (it is moved aside, not deleted)
   -h, --help    show this help";
 
 /// What the start screen should be prefilled with.
@@ -22,6 +24,7 @@ pub struct LaunchArgs {
     pub repo: Option<RepoRoot>,
     pub since: Option<GitRef>,
     pub start: bool,
+    pub fresh: bool,
     pub warning: Option<String>,
 }
 
@@ -43,12 +46,14 @@ impl LaunchArgs {
         let mut path: Option<PathBuf> = None;
         let mut since = None;
         let mut start = false;
+        let mut fresh = false;
         let mut warnings = Vec::new();
         let mut args = args.into_iter();
         while let Some(a) = args.next() {
             match a.as_str() {
                 "-h" | "--help" => return None,
                 "--start" => start = true,
+                "--fresh" => fresh = true,
                 "--since" => match args.next().map(|r| GitRef::new(&r)) {
                     Some(Ok(r)) => since = Some(r),
                     _ => warnings.push("--since needs a branch or commit".to_string()),
@@ -65,7 +70,7 @@ impl LaunchArgs {
         if repo.is_none() && explicit {
             warnings.push(format!("not a git repository: {}", dir.map(|d| d.display().to_string()).unwrap_or_default()));
         }
-        Some(Self { start: start && repo.is_some(), repo, since, warning: (!warnings.is_empty()).then(|| warnings.join("; ")) })
+        Some(Self { start: start && repo.is_some(), fresh, repo, since, warning: (!warnings.is_empty()).then(|| warnings.join("; ")) })
     }
 }
 
@@ -88,7 +93,15 @@ mod tests {
     fn defaults_to_the_repo_of_the_current_directory() {
         let a = parse(&[], &this_repo()).unwrap();
         assert!(a.repo.unwrap().path().join("src-tauri").is_dir());
-        assert!(a.since.is_none() && !a.start && a.warning.is_none());
+        assert!(a.since.is_none() && !a.start && !a.fresh && a.warning.is_none());
+    }
+
+    #[test]
+    fn fresh_start_works_with_or_without_a_repository() {
+        let a = parse(&["--fresh"], &this_repo()).unwrap();
+        assert!(a.fresh && !a.start && a.repo.is_some() && a.warning.is_none());
+        let a = parse(&["--fresh"], "/").unwrap();
+        assert!(a.fresh && a.repo.is_none() && a.warning.is_none());
     }
 
     #[test]

@@ -3,7 +3,8 @@ import { confirm } from './confirm';
 import { settings } from './app-settings.svelte';
 import { changedKeys, parseKey } from './keys';
 import { hunkProgress } from './progress';
-import { go } from './nav';
+import { go, leaveEditor, leaveReview } from './nav';
+import { draftOf, stashStartDraft } from './start-draft';
 import { scrollToLine } from './scroll';
 import { afterAccept } from './blank-lines';
 import { showPanel } from './panels.svelte';
@@ -197,9 +198,7 @@ export async function askAboutSelection(mode: SendMode, body: string, allowEdits
 
 export async function plan(replan: boolean, steps: StepCount) {
   if (await run(replan ? api.replanAi(steps) : api.planAi(steps))) {
-    const planned = app.snap?.chunks.length;
-    const missedTotal = steps.kind === 'exact' && planned !== steps.steps;
-    app.toast(missedTotal ? `AI plan ready: ${planned} steps instead of the ${steps.steps} you asked for` : `AI plan ready: ${planned} chunks`);
+    app.toast(`AI plan ready: ${app.snap?.chunks.length} chunks`);
     const first = app.snap?.chunks.find((c) => app.chunkProgress(c).pending > 0) ?? app.snap?.chunks[0];
     if (first && !replan) go({ kind: 'chunk', id: first.id });
   }
@@ -213,16 +212,15 @@ export function revealThread(t: { id: string; chunk: string | null; anchor: Anch
   if (a && !(a as { outdated?: boolean }).outdated) setTimeout(() => scrollToLine(a.path, a.side, a.start), 60);
 }
 
-/** Throws away all progress for this review and starts again. */
+/** Throws away all progress for this review and goes back to the start screen, filled in with its choices. */
 export async function startOver() {
-  const msg = 'Start this review over? All accepted/later marks, the queue and discussions are discarded. Code is not touched.';
+  const msg = 'Start this review over? All accepted/later marks, the queue and discussions are discarded, and you go back to the start screen. Code is not touched.';
   if (settings.value.prefs.confirmStartOver && !(await confirm(msg, 'Start over'))) return;
+  if (!app.snap || !leaveEditor()) return;
+  const draft = draftOf(app.snap, settings.value.start.order);
   if (!(await run(api.resetReview()))) return;
-  app.history = [];
-  app.future = [];
-  const first = app.snap?.chunks[0];
-  if (first) go({ kind: 'chunk', id: first.id }, false);
-  if (settings.value.start.order === 'ai' && app.snap) plan(false, app.snap.stepCount);
+  stashStartDraft(draft);
+  leaveReview();
 }
 
 export function currentChunkId(): string | null {
